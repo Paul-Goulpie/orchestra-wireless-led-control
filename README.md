@@ -7,7 +7,7 @@ wearable LED nodes over radio.
 ## Overview
 
 This project provides a scalable architecture to control wearable LED
-strips used by up to 50 musicians during live performances.
+strips used by up to 60 musicians during live performances.
 
 Each musician wears a small LED band (up to 10 WS2812B LEDs) driven by
 an Arduino Nano with a dedicated radio receiver.\
@@ -32,7 +32,7 @@ QLC+ (DMX / Art-Net / sACN) ↓ Ethernet Network ↓ Gateway (Raspberry Pi)
 
 ## Features
 
--   Up to 50 independent wireless LED nodes
+-   Up to 60 independent wireless LED nodes
 -   10 RGB LEDs per node (individually addressable)
 -   Real-time DMX universe mapping
 -   Multi-universe support (Art-Net / sACN)
@@ -47,8 +47,8 @@ QLC+ (DMX / Art-Net / sACN) ↓ Ethernet Network ↓ Gateway (Raspberry Pi)
 Each musician is assigned a fixed DMX address block:
 
 -   10 LEDs × 3 channels (RGB) = 30 DMX channels per node
--   50 nodes = 1500 DMX channels
--   Requires 3 DMX universes (512 channels each)
+-   60 nodes = 1800 DMX channels
+-   Requires 4 DMX universes (512 channels for last universe 1,2,3) + (300 channels for last universe 4)
 
 Mapping strategy is configurable in the gateway.
 
