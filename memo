@@ -8,7 +8,23 @@ Fait un projet arduino - compilable et flashable en CLI.
 
 Coté pinout - il doit être possible (via jumper sur les IO ) d'activer un mode test - qui fait un chenillard sur les 10 leds.
 Coté pinout - il doit être possible (via jumper sur les IO ) de paramétrer une adresse - permettant de matérialiser quel est le numéro du recepteur parmis les 60 musiciens.
+Le changement d'une pin est immédiatement inerprété par le soft - pas besoin de reset l'appi
 
-Pour la gestion des leds utilise un lib (dispo dans la collection arduino)
-Pour la gestion des leds utilise un lib (dispo dans la collection arduino)
+Pour la gestion des leds utilise une lib (dispo dans la collection arduino)
+Pour la gestion de la radio une lib (dispo dans la collection arduino)
+
+Exploite un uart pour faire des logs de trace avec formatage
+Au démarrage affiche le nom et la version de l'appli
+
+Coté reception trame radio.
+Sera émis par la gateway une trame de 512 octet par univers (afin de ne pas saturer la petite ram de l'ATmega328P).
+le paquet est structuré de la façon suivante
+uint_8 id_univer | 512 octect max (valeurs DMX) | CRC32
+
+Attention la taille de taille de trame n'es pas fixe (par example pour l'univers 4 il n'y a pas 512 octets) - pex=ux 
+
+Le node reçoit la trame , fait un check CRC
+
+Ajoute des éléments si j'en ai oublié
+
 
