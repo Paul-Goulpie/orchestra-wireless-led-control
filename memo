@@ -1,1 +1,6 @@
 En lisant le Readme.md
+
+
+Réalise le logiciel implementant le node.
+Met le code dans firmware/
+Il est basé sur l'exploitation d'une carte Arduino Nano (ATmega328P) avec recepteur radio intégré (
