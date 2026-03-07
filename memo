@@ -4,6 +4,7 @@ En lisant le Readme.md
 Réalise le logiciel implementant le node.
 Met le code dans firmware/
 Il est basé sur l'exploitation d'une carte Arduino Nano (ATmega328P) avec recepteur radio intégré (RF-Nano for Arduino Nano V3.0, Micro USB Nano Board ATmega328P QFN32 5V 16M CH340, Integrate NRF24L01+2.4G wireless - https://fr.aliexpress.com/item/1005005593392265.html?spm=a2g0o.order_list.order_list_main.17.4d7d1802i1MZ0a&gatewayAdapt=glo2fra).
+Les leds sont sur base de WS2812B (10 leds par nodes).
 Fait un projet arduino - compilable et flashable en CLI.
 
 Coté pinout - il doit être possible (via jumper sur les IO ) d'activer un mode test - qui fait un chenillard sur les 10 leds.
@@ -19,18 +20,27 @@ Au démarrage affiche le nom et la version de l'appli
 Coté reception trame radio.
 Sera émis par la gateway une trame de 512 octet par univers (afin de ne pas saturer la petite ram de l'ATmega328P).
 le paquet est structuré de la façon suivante
-<magic_paquet> ["START_LEDS"] | uint-16 <paquet_len> | uint_8 <id_univers> | 512 octect max <valeurs_DMX> | uint_32 <CRC32>
+<magic_paquet> ["START_LEDS"] (len: strlen("START_LEDS") -1 = 10) | uint-16 <paquet_len> (len: 2) | uint_8 <id_univers> (len: 1) | 512 octect max <valeurs_DMX> (len: 0-512) | uint_32 <CRC32> (len: 4)
 
-Attention la taille de taille de trame n'es pas fixe (par example pour l'univers 4 il n'y a pas 512 octets) 
+Attention la taille de taille de trame n'est pas fixe (par example pour l'univers 4 il n'y a pas 512 octets) 
 
 le paquet_len contient la taille complete du paquet : magic_paquet + paquet_len + id_univers + valeurs_DMX + CRC32
+ainsi il est possible de déterminer le nombre de canaux DMX envoyé - pour info (3 octets DMX pour chaque led)
+En composant avec l' id_univers il est possible de determiner si les valeurs reçues concernane le node (au regard de son adresse).
 
 Le node reçoit la trame , detecte le magic paquet , extrait la longueur, récupère les octets restant et fait un check CRC.
 Une fois la trame validé, le node identifie si le paquet lui est destiné - en comparant son adresse avec le contenu du paquet.
 Afin de determiner si son adresse matche avec la data du paquet - il exploite le id_univers et le paquet_len.
 exemple , le node a l'adresse 42.
 le nombre de led par node est 10.
-le premier paquet a un id_univers=0 et un paquet_len de 
+le premier paquet a un id_univers=0 et un paquet_len de 529 donc, 512 canaux DXM , donc paquet courant a pour adresse max node  : 17 (<id_node> * <nb_dmx_channel_sended> / <channel_dmx_by_led>) (attention les valeurs DMX pour un meme node ne peux pas s'étaler sur 2 univers - prendre en compte cette logique).
+le paquet suivant a un id_univers=1 et un paquet_len de 529 donc, 512 canaux DXM , donc paquet courant a pour adresse max node  : 34 (<id_node> * <nb_dmx_channel_sended> / <channel_dmx_by_led>) (attention les valeurs DMX pour un meme node ne peux pas s'étaler sur 2 univers - prendre en compte cette logique).
+le paquet suivant a un id_univers=2 et un paquet_len de 529 donc, 512 canaux DXM , donc paquet courant a pour adresse max node  : 51 (<id_node> * <nb_dmx_channel_sended> / <channel_dmx_by_led>) (attention les valeurs DMX pour un meme node ne peux pas s'étaler sur 2 univers - prendre en compte cette logique).
+
+Donc les données concernant notre node (@42) est dans le paquet id_univers=2 et commence à l'offset des valeurs DMX ((42-35) * 30 => 210 )
+l'ensemble des valeurs DMX 210 à 240 - sont envoyé aux led du node (WS2812B) 3 valeur par leds.
+
+Il est possible qu'il y ai des ratés dans mes calcul n'hesite pas à les corriger ou à m'en faire part.
 
 Le parseur fonctionne en octet par octet.
 
@@ -38,5 +48,6 @@ En cas de non reception de paquet après plus de 2 secondes - toutes les leds so
 
 
 Ajoute des éléments si j'en ai oublié
+Rédige également un document - résumant l'architecture.
 
 
