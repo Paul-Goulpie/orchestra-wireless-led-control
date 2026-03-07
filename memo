@@ -19,11 +19,19 @@ Au démarrage affiche le nom et la version de l'appli
 Coté reception trame radio.
 Sera émis par la gateway une trame de 512 octet par univers (afin de ne pas saturer la petite ram de l'ATmega328P).
 le paquet est structuré de la façon suivante
-magic paquet ["START_LEDS"] | uint-16 <paquet_len> | uint_8 <id_univers> | 512 octect max <valeurs DMX> | uint_32 <CRC32>
+<magic_paquet> ["START_LEDS"] | uint-16 <paquet_len> | uint_8 <id_univers> | 512 octect max <valeurs_DMX> | uint_32 <CRC32>
 
 Attention la taille de taille de trame n'es pas fixe (par example pour l'univers 4 il n'y a pas 512 octets) 
 
-Le node reçoit la trame , detecte le magic paquet , extrait la longueur, récupère les octets restant et fait un check CRC
+le paquet_len contient la taille complete du paquet : magic_paquet + paquet_len + id_univers + valeurs_DMX + CRC32
+
+Le node reçoit la trame , detecte le magic paquet , extrait la longueur, récupère les octets restant et fait un check CRC.
+Une fois la trame validé, le node identifie si le paquet lui est destiné - en comparant son adresse avec le contenu du paquet.
+Afin de determiner si son adresse matche avec la data du paquet - il exploite le id_univers et le paquet_len.
+exemple , le node a l'adresse 42.
+le nombre de led par node est 10.
+le premier paquet a un id_univers=0 et un paquet_len de 
+
 Le parseur fonctionne en octet par octet.
 
 En cas de non reception de paquet après plus de 2 secondes - toutes les leds sont remise dans leur état initial - à savoir tout éteinds.
