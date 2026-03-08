@@ -4,7 +4,7 @@
 # ============================================================
 
 SKETCH     := orchestra_node/orchestra_node.ino
-FQBN       := arduino:avr:nano:cpu=atmega328old
+FQBN       := arduino:avr:nano:cpu=atmega328
 PORT       ?= /dev/ttyUSB0
 BAUD       ?= 115200
 
