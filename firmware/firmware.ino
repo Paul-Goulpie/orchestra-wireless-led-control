@@ -111,11 +111,26 @@ void stats_reset() {
     memset(&stats, 0, sizeof(stats));
 }
 
+static void print_uptime() {
+    uint32_t s  = millis() / 1000UL;
+    uint32_t m  = s / 60; s %= 60;
+    uint32_t h  = m / 60; m %= 60;
+    if (h < 10) Serial.print('0'); Serial.print(h); Serial.print(':');
+    if (m < 10) Serial.print('0'); Serial.print(m); Serial.print(':');
+    if (s < 10) Serial.print('0'); Serial.print(s);
+}
+
 void stats_print() {
     uint32_t total_for_us = stats.rx_accepted
                           + stats.rx_duplicate
                           + stats.rx_late;
-    Serial.println(F("---- Radio stats (10 s) ----"));
+    Serial.println(F("============================"));
+    Serial.print(F("  " APP_NAME " v" APP_VERSION));
+    Serial.print(F("  uptime: ")); print_uptime(); Serial.println();
+    Serial.print(F("  addr: "));    Serial.print(my_address);
+    Serial.print(F("  mode: "));    Serial.print(test_mode ? F("TEST") : F("normal"));
+    Serial.print(F("  ch: "));      Serial.println(RADIO_CHANNEL);
+    Serial.println(F("----------------------------"));
     Serial.print(F("  rx_total       : ")); Serial.println(stats.rx_total);
     Serial.print(F("  rx_wrong_addr  : ")); Serial.println(stats.rx_wrong_addr);
     Serial.print(F("  rx_for_us      : ")); Serial.println(total_for_us);
@@ -123,7 +138,7 @@ void stats_print() {
     Serial.print(F("    duplicate     : ")); Serial.println(stats.rx_duplicate);
     Serial.print(F("    late          : ")); Serial.println(stats.rx_late);
     Serial.print(F("  frames_lost    : ")); Serial.println(stats.frames_lost);
-    Serial.println(F("----------------------------"));
+    Serial.println(F("============================"));
 }
 
 // ============================================================
