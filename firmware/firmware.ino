@@ -124,7 +124,6 @@ void stats_print() {
     Serial.print(F("    late          : ")); Serial.println(stats.rx_late);
     Serial.print(F("  frames_lost    : ")); Serial.println(stats.frames_lost);
     Serial.println(F("----------------------------"));
-    stats_reset();
 }
 
 // ============================================================
@@ -280,13 +279,15 @@ void loop() {
 
     if (new_addr != my_address) {
         my_address  = new_addr;
-        first_frame = true;           // reset dedup state on address change
+        first_frame = true;
+        stats_reset();
         Serial.print(F("[INFO] Address -> ")); Serial.println(my_address);
         leds_blank();
     }
 
     if (new_test != test_mode) {
         test_mode = new_test;
+        stats_reset();
         Serial.print(F("[INFO] Test mode -> "));
         Serial.println(test_mode ? F("ON") : F("OFF"));
         if (!test_mode) leds_blank();
