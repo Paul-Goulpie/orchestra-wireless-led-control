@@ -56,6 +56,8 @@ compile: check-cli
 	$(CLI) compile \
 		--fqbn $(FQBN) \
 		--output-dir $(OUTPUT_DIR) \
+		--build-property "build.extra_flags=-DSERIAL_TX_BUFFER_SIZE=256" \
+		--clean \
 		$(SKETCH)
 
 ## Upload to the board
