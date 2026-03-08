@@ -50,4 +50,44 @@ En cas de non reception de paquet après plus de 2 secondes - toutes les leds so
 Ajoute des éléments si j'en ai oublié
 Rédige également un document - résumant l'architecture.
 
+--------------------------------------
+
+
+Fait évoluer la solution existante
+En passant le débit de 250kbps à 1Mbps
+
+On n'utilise plus de longue trames de 512.
+Mais une trame radio de 32 octet par node en utilisant la logique suivante:
+[ dst_addr | frame_id | 30 octets RGB ]
+
+struct __attribute__((packed)) node_packet_v1 {
+    uint8_t  dst_addr;      /* 1..63, 0 interdit */
+    uint8_t  frame_id;      /* numéro de frame, incrémenté par le gateway */
+    uint8_t  rgb[30];       /* 10 LED x 3 octets */
+};
+
+On ne fait plus de CRC - on s'appui sur le CRC radio.
+
+On gère frame_id selon la logique suivante:
+```
+Sans frame_id, un nœud ne peut pas savoir si un paquet reçu est :
+
+- un nouveau frame
+- un doublon
+- un vieux paquet arrivé en retard
+
+Or sur une radio ISM, ces cas arrivent régulièrement.
+```
+
+Ajoute l'affichage de stat radio toutes les 10 secondes (pour lister par exemple le nombre de paquet qui ont été perdu)
+
+Met à jour les documents (README.md et docs/architecture.md) en conséquence.
+utilise direcement le sous dossier firmware/ pour localiser les sources n'utilise pas le sous sous dossier firmware/orchestra_node/ (déplace le contenu de firmware/orchestra_node dans firmware - met à jour le Makefile)
+
+En cas de non présence de arduino-cli (detecté via Makefile) affiche les info pour l'installer ainsi que les sous éléments de avr.
+Ajoute une mention d'install de arduino-cli dans les documents.
+
+
+
+
 

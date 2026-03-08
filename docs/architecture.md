@@ -9,17 +9,16 @@ QLC+ (DMX / Art-Net / sACN)
         |
   Gateway (Raspberry Pi + NRF24L01+)
         |
-   2.4 GHz broadcast
+   2.4 GHz broadcast  (1 Mbps, channel 76)
         |
   Up to 60 x Arduino Nano Nodes (RF-Nano)
         |
   WS2812B LED strip (10 LEDs / node)
 ```
 
-The gateway receives DMX universes from QLC+ and rebroadcasts them over
-2.4 GHz radio as a simple binary protocol. Every node silently receives
-all broadcasts and extracts only the RGB values that concern its own
-address.
+The gateway receives DMX universes from QLC+ and sends one 32-byte radio
+frame per node per lighting frame. Each node filters on its own address
+and applies the embedded RGB data directly to the LED strip.
 
 ---
 
@@ -32,33 +31,27 @@ address.
 | Pin | Function | Notes |
 |-----|----------|-------|
 | D2  | WS2812B data | LED strip signal |
-| D3  | Test mode jumper | Pull LOW to activate |
-| D4  | Address bit 0 (LSB) | Pull LOW = bit set |
+| D3  | Test mode jumper | Pull LOW → chenillard mode |
+| D4  | Address bit 0 (LSB) | Active LOW + internal pull-up |
 | D5  | Address bit 1 | |
 | D6  | Address bit 2 | |
 | D7  | Address bit 3 | |
 | D8  | Address bit 4 | |
-| A0  | Address bit 5 (MSB) | |
+| A0  | Address bit 5 (MSB) | 6 bits → addresses 1-63 |
 | D9  | NRF24L01 CSN | Built-in on RF-Nano |
 | D10 | NRF24L01 CE  | Built-in on RF-Nano |
-| D11 | SPI MOSI | Built-in |
-| D12 | SPI MISO | Built-in |
-| D13 | SPI SCK  | Built-in |
+| D11-13 | SPI | Built-in |
 
-All jumper pins use the internal pull-up resistor. Closing a jumper to GND
-activates the corresponding bit/mode. Changes are picked up on every loop
-iteration — no reset required.
+Jumper changes take effect immediately without reset.
 
 ### Address encoding
 
-6 address bits → values 0–63. Valid node addresses: **1 to 60**.
-Address 0 means unconfigured (node receives but ignores DMX data).
+6 bits → valid node addresses **1–60** (0 = unconfigured, ignored).
 
 ### Test mode (chenillard)
 
-When `D3` is pulled LOW, the node ignores radio traffic and runs a blue
-LED chase pattern (one LED on at a time, 100 ms per step). This mode
-is useful to verify wiring before deployment.
+Pulling `D3` LOW disables radio processing and runs a blue LED chase
+(one LED lit at a time, 100 ms/step). Used to verify wiring before deployment.
 
 ---
 
@@ -68,115 +61,131 @@ is useful to verify wiring before deployment.
 |-----------|-------|
 | Chip | NRF24L01+ |
 | Frequency | 2.4 GHz, channel 76 |
-| Data rate | 250 kbps |
+| Data rate | **1 Mbps** |
 | Payload size | 32 bytes (fixed) |
 | Auto-ACK | Disabled (broadcast) |
+| CRC | Hardware CRC-16 (NRF24L01 built-in) |
 | Pipe address | `0xE8E8F0F0E1` |
 
-The gateway writes to this pipe. All nodes open it as reading pipe 1.
-The 32-byte NRF24L01 payloads are **transparent transport**: the gateway
-fragments its logical packet into consecutive 32-byte chunks; the node
-reassembles by feeding every byte through the parser.
+The gateway writes to the shared pipe; all nodes open it as reading pipe 1.
+Software CRC is not used — the radio's built-in CRC-16 provides integrity.
 
 ---
 
-## Packet format
+## Packet format — `node_packet_v1`
 
-```
-+------------------+----------+------------+------------------+----------+
-| magic            | pkt_len  | id_univers |  valeurs_DMX     | CRC32    |
-| "START_LEDS"     | uint16   | uint8      | 0 – 512 bytes    | uint32   |
-| 10 bytes         | 2 bytes  | 1 byte     |                  | 4 bytes  |
-+------------------+----------+------------+------------------+----------+
+```c
+struct __attribute__((packed)) node_packet_v1 {
+    uint8_t dst_addr;   /* destination node address (1-63) */
+    uint8_t frame_id;   /* wrapping counter, incremented per frame */
+    uint8_t rgb[30];    /* 10 LED × 3 bytes (R, G, B) */
+};
+/* sizeof == 32 bytes == NRF24L01 payload size */
 ```
 
-- **magic** — ASCII string `START_LEDS` (no NUL terminator).
-- **pkt_len** — total packet size in bytes (magic + pkt_len + id_univers +
-  DMX payload + CRC32), little-endian. Full universe: `17 + 512 = 529`.
-- **id_univers** — 0-based universe index.
-- **valeurs_DMX** — raw DMX channel values, 3 bytes per LED (R, G, B).
-  A node's data must not span two universes.
-- **CRC32** — covers all preceding bytes (magic through last DMX byte),
-  little-endian.
+- **dst_addr** — node filters any packet where `dst_addr != my_address`.
+- **frame_id** — monotonically increasing uint8 (wraps 255→0). Used to
+  detect duplicates, late packets, and dropped frames.
+- **rgb[30]** — raw RGB values; `rgb[i*3]` = R, `rgb[i*3+1]` = G,
+  `rgb[i*3+2]` = B for LED `i`.
 
 ---
 
-## DMX addressing model
+## frame_id logic
+
+Without a frame counter, a node cannot distinguish a new frame from a
+retransmission or a late-arriving packet (common in ISM-band environments).
 
 ```
-CHANNELS_PER_NODE  = 10 LEDs × 3 channels = 30
-NODES_PER_UNIVERSE = floor(512 / 30)       = 17
-```
+diff = (int8_t)(received.frame_id - last_frame_id)   // signed wrap arithmetic
 
-| Universe | Nodes |
-|----------|-------|
-| 0 | 1 – 17  |
-| 1 | 18 – 34 |
-| 2 | 35 – 51 |
-| 3 | 52 – 60 (9 nodes, 270 DMX channels) |
-
-For node address **N** (1-based):
-
-```
-my_universe       = (N − 1) / NODES_PER_UNIVERSE     (integer division)
-first_node_in_univ = my_universe × NODES_PER_UNIVERSE + 1
-dmx_offset        = (N − first_node_in_univ) × CHANNELS_PER_NODE
-```
-
-**Example — node 42:**
-
-```
-my_universe        = (42 − 1) / 17 = 2
-first_node_in_univ = 2 × 17 + 1    = 35
-dmx_offset         = (42 − 35) × 30 = 210
-LED data           = DMX bytes [210 … 239]
+diff == 0  →  duplicate      (discard, count rx_duplicate)
+diff  < 0  →  late / reorder (discard, count rx_late)
+diff  > 1  →  gap detected   (accept, frames_lost += diff - 1)
+diff == 1  →  normal next    (accept)
 ```
 
 ---
 
-## Node firmware state machine
-
-The parser processes one byte at a time:
+## Radio statistics (logged every 10 s)
 
 ```
-PS_MAGIC ──(10 magic bytes matched)──> PS_LEN_LOW
-PS_LEN_LOW ─────────────────────────> PS_LEN_HIGH
-PS_LEN_HIGH ─(valid length)──────────> PS_UNIVERSE
-PS_UNIVERSE ─(dmx_len > 0)───────────> PS_DMX_DATA
-            └(dmx_len == 0)──────────> PS_CRC
-PS_DMX_DATA ─(all DMX bytes received)> PS_CRC
-PS_CRC ─────(4 bytes received)───────> process_packet() → PS_MAGIC
+---- Radio stats (10 s) ----
+  rx_total       : total payloads pulled from radio FIFO
+  rx_wrong_addr  : payloads for other nodes
+  rx_for_us      : accepted + duplicate + late
+    accepted      : new frames applied to LEDs
+    duplicate     : same frame_id as previous
+    late          : frame_id older than previous
+  frames_lost    : estimated missed frames (frame_id gaps)
+----------------------------
 ```
 
-CRC is accumulated as bytes arrive (no separate second pass needed).
+---
 
-Any framing error (bad magic byte, invalid length) resets the machine to
-`PS_MAGIC`.
+## DMX mapping
+
+```
+CHANNELS_PER_NODE  = 10 LEDs × 3 ch = 30
+```
+
+The gateway maps each QLC+ DMX channel block to the `rgb[30]` field of
+the corresponding node's packet. Multi-universe management is handled
+entirely on the gateway side; nodes are unaware of DMX universes.
 
 ---
 
 ## Timeout
 
-If no packet passes CRC validation within **2 seconds**, all LEDs are
-turned off. This ensures the band goes dark if the gateway stops
-transmitting or the radio link is lost.
+If no packet passes address/frame validation within **2 seconds**,
+all LEDs are turned off.
 
 ---
 
 ## Build & flash
 
+### Prerequisites
+
+#### 1. Install arduino-cli
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+sudo mv bin/arduino-cli /usr/local/bin/
+```
+
+#### 2. Init and install AVR core
+
+```bash
+arduino-cli config init
+arduino-cli core update-index
+arduino-cli core install arduino:avr   # ATmega328P / Nano support
+```
+
+#### 3. Install project libraries
+
 ```bash
 cd firmware
-make libs        # install FastLED + RF24 (once)
-make flash PORT=/dev/ttyUSB0
-make monitor PORT=/dev/ttyUSB0
+make libs   # installs FastLED and RF24
 ```
+
+### Build commands
+
+```bash
+cd firmware
+make compile               # compile only
+make flash PORT=/dev/ttyUSB0   # compile + upload
+make monitor PORT=/dev/ttyUSB0 # open serial monitor (115200 baud)
+make clean                 # remove build artefacts
+```
+
+If `arduino-cli` is not found, `make` will print the full install
+instructions automatically.
 
 ---
 
 ## Libraries
 
-| Library | Purpose | Arduino library name |
-|---------|---------|----------------------|
+| Library | Purpose | Install name |
+|---------|---------|-------------|
 | FastLED | WS2812B control | `FastLED` |
 | RF24    | NRF24L01+ driver | `RF24` |

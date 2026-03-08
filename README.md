@@ -9,48 +9,38 @@ wearable LED nodes over radio.
 This project provides a scalable architecture to control wearable LED
 strips used by up to 60 musicians during live performances.
 
-Each musician wears a small LED band (up to 10 WS2812B LEDs) driven by
-an Arduino Nano with a dedicated radio receiver.\
-A central gateway receives DMX data from QLC+ (via Art-Net or sACN) and
-broadcasts synchronized lighting frames to all wireless nodes.
-
-The system is designed for:
-
--   Low latency
--   Deterministic synchronization
--   Scalable multi-node control
--   Real-time stage performance reliability
+Each musician wears a small LED band (10 WS2812B LEDs) driven by an
+RF-Nano (Arduino Nano + NRF24L01+). A central gateway receives DMX data
+from QLC+ (via Art-Net or sACN) and sends one 32-byte radio frame per
+node per lighting tick.
 
 ------------------------------------------------------------------------
 
 ## System Architecture
 
-QLC+ (DMX / Art-Net / sACN) ↓ Ethernet Network ↓ Gateway (Raspberry Pi)
-↓ Radio Broadcast ↓ 50x Arduino Nano Nodes ↓ WS2812B LED Bands
+```
+QLC+ (DMX / Art-Net / sACN)
+        |  Ethernet
+  Gateway (Raspberry Pi + NRF24L01+)
+        |  2.4 GHz broadcast — 1 Mbps
+  Up to 60 × RF-Nano Nodes
+        |
+  WS2812B LED strips (10 LEDs / node)
+```
 
 ------------------------------------------------------------------------
 
 ## Features
 
--   Up to 60 independent wireless LED nodes
--   10 RGB LEDs per node (individually addressable)
--   Real-time DMX universe mapping
--   Multi-universe support (Art-Net / sACN)
--   Frame synchronization via sequence numbering
--   Compact RF protocol for efficient bandwidth usage
--   Designed for live performance environments
-
-------------------------------------------------------------------------
-
-## DMX Mapping
-
-Each musician is assigned a fixed DMX address block:
-
--   10 LEDs × 3 channels (RGB) = 30 DMX channels per node
--   60 nodes = 1800 DMX channels
--   Requires 4 DMX universes (512 channels for last universe 1,2,3) + (300 channels for last universe 4)
-
-Mapping strategy is configurable in the gateway.
+- Up to 60 independent wireless LED nodes
+- 10 RGB LEDs per node (individually addressable)
+- Compact 32-byte unicast radio frame per node
+- frame_id for duplicate / late-packet detection
+- Hardware CRC-16 (NRF24L01 built-in) — no software CRC overhead
+- Jumper-configurable node address (no firmware recompile)
+- Jumper-activated test mode (blue LED chenillard)
+- Radio statistics printed every 10 s over UART
+- 2 s RX timeout → LEDs off on signal loss
 
 ------------------------------------------------------------------------
 
@@ -58,34 +48,74 @@ Mapping strategy is configurable in the gateway.
 
 ### Gateway
 
--   Raspberry Pi
--   Radio transmitter module (e.g., nRF24L01+)
+- Raspberry Pi (any model with GPIO)
+- NRF24L01+ module
 
 ### Node (per musician)
 
--   Arduino Nano (ATmega328P)
--   Radio receiver module
--   WS2812B LED strip (max 10 LEDs)
--   5V power supply
+- RF-Nano (ATmega328P + NRF24L01+ integrated)
+- WS2812B LED strip — 10 LEDs
+- 6 address jumpers + 1 test-mode jumper
+- 5 V power supply
 
 ------------------------------------------------------------------------
 
-## Design Goals
+## Radio Protocol
 
--   Minimal RF latency
--   High reliability in crowded RF environments
--   Deterministic frame updates
--   Simple addressing model per musician
--   Modular firmware and gateway architecture
+| Parameter | Value |
+|-----------|-------|
+| Data rate | 1 Mbps |
+| Channel | 76 (2.476 GHz) |
+| Payload | 32 bytes fixed |
+| CRC | Hardware CRC-16 |
+
+### Packet — `node_packet_v1`
+
+```c
+struct __attribute__((packed)) node_packet_v1 {
+    uint8_t dst_addr;  /* node address 1-63 */
+    uint8_t frame_id;  /* wrapping frame counter */
+    uint8_t rgb[30];   /* 10 LED × R,G,B */
+};
+```
+
+See [docs/architecture.md](docs/architecture.md) for full protocol details.
+
+------------------------------------------------------------------------
+
+## Quick Start
+
+### 1. Install arduino-cli
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+sudo mv bin/arduino-cli /usr/local/bin/
+arduino-cli config init
+arduino-cli core update-index
+arduino-cli core install arduino:avr
+```
+
+### 2. Build and flash
+
+```bash
+cd firmware
+make libs                        # install FastLED + RF24 (once)
+make flash PORT=/dev/ttyUSB0
+make monitor PORT=/dev/ttyUSB0   # view UART logs at 115200 baud
+```
+
+> If `arduino-cli` is missing, `make` will print install instructions.
 
 ------------------------------------------------------------------------
 
 ## Repository Structure
 
-/gateway → DMX receiver + RF broadcaster\
-/firmware → Arduino Nano LED node firmware\
-/docs → Protocol specification and architecture\
-/hardware → Schematics and wiring diagrams
+```
+/firmware   → Arduino Nano node firmware + Makefile
+/gateway    → DMX receiver + RF broadcaster (Raspberry Pi)
+/docs       → Protocol specification and architecture
+/hardware   → Schematics and wiring diagrams
+```
 
 ------------------------------------------------------------------------
 
