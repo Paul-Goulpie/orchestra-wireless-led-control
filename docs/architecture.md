@@ -30,14 +30,14 @@ and applies the embedded RGB data directly to the LED strip.
 
 | Pin | Function | Notes |
 |-----|----------|-------|
-| D2  | WS2812B data | LED strip signal |
-| D3  | Test mode jumper | Pull LOW → chenillard mode |
-| D4  | Address bit 0 (LSB) | Active LOW + internal pull-up |
-| D5  | Address bit 1 | |
-| D6  | Address bit 2 | |
-| D7  | Address bit 3 | |
-| D8  | Address bit 4 | |
-| A0  | Address bit 5 (MSB) | 6 bits → addresses 1-63 |
+| **A0** | **WS2812B data** | Isolated on analog side |
+| D2  | Test mode jumper | Pull LOW → chenillard mode |
+| D3  | Address bit 0 (LSB) | Active LOW + internal pull-up |
+| D4  | Address bit 1 | |
+| D5  | Address bit 2 | |
+| D6  | Address bit 3 | |
+| D7  | Address bit 4 | |
+| D8  | Address bit 5 (MSB) | 6 bits → addresses 1-63 |
 | D9  | NRF24L01 CSN | Built-in on RF-Nano |
 | D10 | NRF24L01 CE  | Built-in on RF-Nano |
 | D11-13 | SPI | Built-in |

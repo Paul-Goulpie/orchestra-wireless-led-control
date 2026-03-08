@@ -29,16 +29,16 @@
 // ============================================================
 //  Pin assignments  (RF-Nano: CE=D10, CSN=D9, SPI=D11-13)
 // ============================================================
-#define PIN_LED_DATA    2
+#define PIN_LED_DATA    A0  // WS2812B data — isolated on analog side
 
-#define PIN_TEST_MODE   3   // jumper to GND → test mode
+#define PIN_TEST_MODE   2   // jumper to GND → test mode
 
-#define PIN_ADDR_BIT0   4   // address jumpers, active LOW + pull-up
-#define PIN_ADDR_BIT1   5
-#define PIN_ADDR_BIT2   6
-#define PIN_ADDR_BIT3   7
-#define PIN_ADDR_BIT4   8
-#define PIN_ADDR_BIT5   A0  // gives 0-63
+#define PIN_ADDR_BIT0   3   // address jumpers, active LOW + pull-up
+#define PIN_ADDR_BIT1   4
+#define PIN_ADDR_BIT2   5
+#define PIN_ADDR_BIT3   6
+#define PIN_ADDR_BIT4   7
+#define PIN_ADDR_BIT5   8   // MSB — gives addresses 0-63
 
 #define RF_CE_PIN       10
 #define RF_CSN_PIN      9
