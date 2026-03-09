@@ -40,6 +40,7 @@ static void set_defaults(app_config_t *cfg)
     cfg->radio.channel          = 76;
     cfg->radio.data_rate        = RADIO_RATE_1MBPS;
     cfg->radio.repeat_count     = 1;
+    cfg->radio.irq_pin          = -1;
     cfg->sacn_timeout_ms        = 2000;
     cfg->refresh_interval_ms    = 1000;
 }
@@ -81,6 +82,7 @@ static int parse_json(const char *json_str, app_config_t *cfg)
         GET_U8 ("ce_pin",        cfg->radio.ce_pin)
         GET_U8 ("channel",       cfg->radio.channel)
         GET_INT("repeat_count",  cfg->radio.repeat_count)
+        GET_INT("irq_pin",       cfg->radio.irq_pin)
 
         if ((item = cJSON_GetObjectItemCaseSensitive(radio, "data_rate")) &&
             cJSON_IsString(item))

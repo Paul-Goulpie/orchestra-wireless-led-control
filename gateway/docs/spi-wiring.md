@@ -22,12 +22,17 @@ All signals are **3.3 V logic**; the NRF24L01+ module also runs at 3.3 V.
 | 5 | SCK   | 23 | SPI0_CLK  | SPI clock |
 | 6 | MOSI  | 19 | SPI0_MOSI | SPI data out |
 | 7 | MISO  | 21 | SPI0_MISO | SPI data in |
-| 8 | IRQ   | —  | —         | Not used (polling mode) |
+| 8 | IRQ   | 18 | **PC6 / GPIO 70** | Optional — interrupt-driven TX (active LOW) |
 
-> CE pin: PA0 corresponds to GPIO number **0** in the sysfs/libgpiod
+> **CE pin:** PA0 corresponds to GPIO number **0** in the sysfs/libgpiod
 > numbering on the OPi Zero 3. Update `ce_pin` in `orchgateway.json`.
 > You can use any free GPIO — just pick a convenient one and update the
 > config accordingly.
+>
+> **IRQ pin:** connecting the NRF24L01+ IRQ output (active LOW, open-drain)
+> to a free GPIO enables interrupt-driven TX mode.
+> Suggested pin: header pin **18** → OPi GPIO **70** (PC6).
+> Leave `"irq_pin": -1` in the config to keep the blocking fallback.
 
 ---
 
@@ -66,9 +71,15 @@ ls -l /dev/spidev0.0
   "ce_pin":       0,
   "channel":      76,
   "data_rate":    "1mbps",
-  "repeat_count": 1
+  "repeat_count": 1,
+  "irq_pin":      -1
 }
 ```
+
+Set `"irq_pin"` to the BCM/sysfs GPIO number of the pin connected to the
+NRF24L01+ IRQ output to enable interrupt-driven TX (e.g. `70` for OPi Zero 3
+header pin 18, or `24` for RPi BCM 24). Keep `-1` for blocking TX (no wiring
+required).
 
 ---
 
@@ -92,8 +103,10 @@ If using a Raspberry Pi instead of Orange Pi Zero 3:
 | 5 | SCK   | 23 | 11 |
 | 6 | MOSI  | 19 | 10 |
 | 7 | MISO  | 21 | 9 |
+| 8 | IRQ   | 18 | **24** (optional) |
 
 CE = GPIO 25 (BCM) → set `"ce_pin": 25` in config (RPi default).
+IRQ = GPIO 24 (BCM) → set `"irq_pin": 24` to enable interrupt-driven TX.
 
 ---
 

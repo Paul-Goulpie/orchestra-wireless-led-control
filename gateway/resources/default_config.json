@@ -5,7 +5,8 @@
     "ce_pin": 25,
     "channel": 76,
     "data_rate": "1mbps",
-    "repeat_count": 1
+    "repeat_count": 1,
+    "irq_pin": -1
   },
   "network": {
     "sacn_timeout_ms": 2000,

@@ -14,6 +14,7 @@ typedef struct {
     char         spi_device[64]; /* e.g. "/dev/spidev0.0" */
     uint32_t     spi_speed_hz;   /* SPI clock speed, e.g. 10000000 */
     uint8_t      ce_pin;         /* GPIO BCM pin for CE */
+    int          irq_pin;        /* GPIO BCM pin for IRQ (-1 = disabled, use blocking TX) */
     uint8_t      channel;        /* RF channel 0-125 */
     radio_rate_t data_rate;
     int          repeat_count;   /* extra TX repetitions (0 = send once total) */
