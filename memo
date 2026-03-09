@@ -87,7 +87,13 @@ utilise direcement le sous dossier firmware/ pour localiser les sources n'utilis
 En cas de non présence de arduino-cli (detecté via Makefile) affiche les info pour l'installer ainsi que les sous éléments de avr.
 Ajoute une mention d'install de arduino-cli dans les documents.
 
+--------------------------------------
 
+Maintenant on passe à l'implémentation coté gateway
 
+Met tout le code et le Makefile dans /gateway
 
-
+le projet sera codé en C.
+Coté cible ça sera du linux - compilable en direct ou cross compile pour cible arm.
+La cible finale sera une Orange-Pi-Zero-3 sous debian - http://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/details/Orange-Pi-Zero-3.html
+Le module RF24 sera le suivant : NRF24L01+PA+LNA - https://www.amazon.fr/dp/B0DT6XTJ8H?ref=ppx_yo2ov_dt_b_fed_asin_title
