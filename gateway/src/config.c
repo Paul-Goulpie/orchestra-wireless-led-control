@@ -256,7 +256,7 @@ void config_print(const app_config_t *cfg)
     LOG_INFO("  Nodes (%d):", cfg->num_nodes);
     for (int i = 0; i < cfg->num_nodes; i++) {
         const node_state_t *n = &cfg->nodes[i];
-        LOG_INFO("    [%d] addr=%-2u  leds=%u  univ=%-5u  dmx_start=%-4u  name=%s",
+        LOG_INFO("    [%2d] addr=%-3u leds=%-3u univ=%-2u dmx_start=%-4u name=%s",
                  i, n->address, n->num_leds,
                  n->universe_id, n->dmx_start, n->name);
     }
