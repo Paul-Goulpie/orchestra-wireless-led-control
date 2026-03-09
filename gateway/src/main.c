@@ -136,6 +136,7 @@ static void print_help(const char *prog)
         "  %-32s %s\n"
         "  %-32s %s\n"
         "  %-32s %s\n"
+        "  %-32s %s\n"
         "  %-32s %s (default: " DEFAULT_CFG ")\n"
         "  %-32s %s (default: 76)\n"
         "  %-32s %s (default: 1mbps)\n"
@@ -149,18 +150,20 @@ static void print_help(const char *prog)
         "\n"
         "Examples:\n"
         "  %s -v -f /tmp/myconf.json\n"
+        "  %s --dry-run -v            # validate sACN reception without radio\n"
         "  %s --channel 100 --repeat-count 2\n",
         prog,
         "-h, --help",            "Show this help and exit",
         "-V, --version",         "Show version and exit",
         "-v, --verbose",         "Enable debug output",
+        "-n, --dry-run",         "Disable radio — log TX instead (sACN validation)",
         "-f, --config FILE",     "Configuration file",
         "-c, --channel N",       "RF channel override (0-125)",
         "-R, --data-rate RATE",  "RF data rate override",
         "-r, --repeat-count N",  "Extra TX repetitions per packet",
         "-t, --sacn-timeout MS", "sACN source-loss timeout in ms",
         "-s, --stats-interval S","Statistics print interval (seconds)",
-        prog, prog);
+        prog, prog, prog);
 }
 
 /* -----------------------------------------------------------------------
@@ -183,6 +186,7 @@ int main(int argc, char *argv[])
 {
     const char *config_path = DEFAULT_CFG;
     int         verbose     = 0;
+    int         dry_run     = 0;
     int         stats_ivl   = 30;
     int         ov_channel  = -1;
     int         ov_repeat   = -1;
@@ -193,6 +197,7 @@ int main(int argc, char *argv[])
         { "help",           no_argument,       NULL, 'h' },
         { "version",        no_argument,       NULL, 'V' },
         { "verbose",        no_argument,       NULL, 'v' },
+        { "dry-run",        no_argument,       NULL, 'n' },
         { "config",         required_argument, NULL, 'f' },
         { "channel",        required_argument, NULL, 'c' },
         { "data-rate",      required_argument, NULL, 'R' },
@@ -203,11 +208,12 @@ int main(int argc, char *argv[])
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "hVvf:c:R:r:t:s:", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hVvnf:c:R:r:t:s:", long_opts, NULL)) != -1) {
         switch (opt) {
         case 'h': print_help(argv[0]); return 0;
         case 'V': printf("%s %s\n", APP_NAME, APP_VERSION); return 0;
         case 'v': verbose     = 1;            break;
+        case 'n': dry_run     = 1;            break;
         case 'f': config_path = optarg;       break;
         case 'c': ov_channel  = atoi(optarg); break;
         case 'R': ov_rate     = optarg;       break;
@@ -277,7 +283,9 @@ int main(int argc, char *argv[])
     }
 
     /* ---- Initialize radio ---- */
-    if (radio_init(&cfg.radio) != 0) {
+    if (dry_run) {
+        LOG_INFO("*** DRY-RUN mode — radio disabled, TX will be logged only ***");
+    } else if (radio_init(&cfg.radio) != 0) {
         LOG_ERROR("Radio initialization failed");
         sacn_recv_deinit();
         return 1;
@@ -340,26 +348,32 @@ int main(int argc, char *argv[])
         pthread_mutex_unlock(&gw.mutex);
 
         /* --- Transmit (outside lock — radio TX can take several ms) --- */
+#define DO_SEND(pkt_ptr) \
+        do { \
+            g_stats.radio_tx_total++; \
+            if (dry_run) { \
+                LOG_INFO("[dry-run] TX node %-2u  R=%3u G=%3u B=%3u  frame=%u", \
+                         (pkt_ptr)->dst_addr, \
+                         (pkt_ptr)->rgb[0], (pkt_ptr)->rgb[1], (pkt_ptr)->rgb[2], \
+                         (pkt_ptr)->frame_id); \
+            } else { \
+                int _r = radio_send((pkt_ptr), sizeof(*(pkt_ptr))); \
+                if (_r != 0) { g_stats.radio_tx_failed++; \
+                               LOG_WARN("TX failed: node %u", (pkt_ptr)->dst_addr); } \
+                else { LOG_DEBUG("TX node %u frame_id=%u", \
+                                 (pkt_ptr)->dst_addr, (pkt_ptr)->frame_id); } \
+            } \
+        } while (0)
+
         if (do_blackout) {
             for (int i = 0; i < cfg.num_nodes; i++) {
                 node_packet_v1_t pkt;
                 node_build_off_packet(&cfg.nodes[i], &pkt);
-                int ret = radio_send(&pkt, sizeof(pkt));
-                g_stats.radio_tx_total++;
-                if (ret != 0) g_stats.radio_tx_failed++;
+                DO_SEND(&pkt);
             }
         } else {
-            for (int i = 0; i < tx_count; i++) {
-                int ret = radio_send(&tx_queue[i], sizeof(tx_queue[i]));
-                g_stats.radio_tx_total++;
-                if (ret != 0) {
-                    g_stats.radio_tx_failed++;
-                    LOG_WARN("TX failed: node %u", tx_queue[i].dst_addr);
-                } else {
-                    LOG_DEBUG("TX node %u frame_id=%u",
-                              tx_queue[i].dst_addr, tx_queue[i].frame_id);
-                }
-            }
+            for (int i = 0; i < tx_count; i++)
+                DO_SEND(&tx_queue[i]);
         }
 
         /* --- Periodic refresh: re-send current state to initialized nodes --- */
@@ -379,12 +393,12 @@ int main(int argc, char *argv[])
             pthread_mutex_unlock(&gw.mutex);
 
             for (int i = 0; i < refresh_count; i++) {
-                int ret = radio_send(&refresh_queue[i], sizeof(refresh_queue[i]));
-                g_stats.radio_tx_total++;
                 g_stats.radio_refresh_total++;
-                if (ret != 0) g_stats.radio_tx_failed++;
+                DO_SEND(&refresh_queue[i]);
             }
         }
+
+#undef DO_SEND
 
         /* --- Statistics --- */
         struct timespec now_ts;
@@ -398,15 +412,18 @@ int main(int argc, char *argv[])
     }
 
     /* ---- Graceful shutdown ---- */
-    LOG_INFO("Shutting down — sending blackout...");
-    for (int i = 0; i < cfg.num_nodes; i++) {
-        node_packet_v1_t pkt;
-        node_build_off_packet(&cfg.nodes[i], &pkt);
-        radio_send(&pkt, sizeof(pkt));
+    LOG_INFO("Shutting down...");
+    if (!dry_run) {
+        LOG_INFO("Sending blackout...");
+        for (int i = 0; i < cfg.num_nodes; i++) {
+            node_packet_v1_t pkt;
+            node_build_off_packet(&cfg.nodes[i], &pkt);
+            radio_send(&pkt, sizeof(pkt));
+        }
     }
 
     sacn_recv_deinit();
-    radio_close();
+    if (!dry_run) radio_close();
     pthread_cond_destroy(&gw.cond);
     pthread_mutex_destroy(&gw.mutex);
 
