@@ -6,8 +6,9 @@
  */
 
 #include "config.h"
-#include "sacn.h"
 #include "log.h"
+
+#define SACN_DEFAULT_PORT 5568
 #include "default_config_data.h"
 
 #include <cjson/cJSON.h>
@@ -112,7 +113,7 @@ static int parse_json(const char *json_str, app_config_t *cfg)
             if (!cJSON_IsObject(u)) continue;
 
             universe_cfg_t *uc = &cfg->universes[cfg->num_universes];
-            uc->port = SACN_PORT;
+            uc->port = SACN_DEFAULT_PORT;
 
             cJSON *item;
             if ((item = cJSON_GetObjectItemCaseSensitive(u, "name")) &&

@@ -2,14 +2,11 @@ APP      := orchgateway
 CC       := gcc
 CXX      := g++
 
-CFLAGS   := -Wall -Wextra -O2 -std=c11   -D_POSIX_C_SOURCE=200809L
+CFLAGS   := -Wall -Wextra -O2 -std=c11 -D_POSIX_C_SOURCE=200809L
 CXXFLAGS := -Wall -Wextra -O2 -std=c++14
 
-LDFLAGS  :=
-LIBS     := -lrf24 -lcjson -lpthread
-
-SRC_DIR  := src
-RES_DIR  := resources
+SRC_DIR   := src
+RES_DIR   := resources
 BUILD_DIR := build
 
 # Resource: default config embedded as a C byte array
@@ -20,8 +17,8 @@ RESOURCE_H    := $(SRC_DIR)/default_config_data.h
 SRCS_C   := $(wildcard $(SRC_DIR)/*.c)
 SRCS_CPP := $(wildcard $(SRC_DIR)/*.cpp)
 
-OBJS := $(patsubst $(SRC_DIR)/%.c,   $(BUILD_DIR)/%.o, $(SRCS_C))   \
-        $(patsubst $(SRC_DIR)/%.cpp,  $(BUILD_DIR)/%.o, $(SRCS_CPP))
+OBJS := $(patsubst $(SRC_DIR)/%.c,  $(BUILD_DIR)/%.o, $(SRCS_C))  \
+        $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(SRCS_CPP))
 
 DEPS := $(OBJS:.o=.d)
 
@@ -31,8 +28,18 @@ ifdef CROSS_PREFIX
     CXX := $(CROSS_PREFIX)g++
 endif
 
-# RF24 include paths (common install locations)
+# ---- Library paths -----------------------------------------------------------
+
+# RF24
 RF24_INC := $(firstword $(wildcard /usr/include/RF24 /usr/local/include/RF24))
+
+# sACN + EtcPal (ETC Labs)
+SACN_INC := /usr/local/include
+SACN_LIB := /usr/local/lib
+
+# cJSON (system package)
+CJSON_CFLAGS := $(shell pkg-config --cflags libcjson 2>/dev/null)
+CJSON_LIBS   := $(shell pkg-config --libs   libcjson 2>/dev/null || echo -lcjson)
 
 # --------------------------------------------------------------------------
 
@@ -40,19 +47,24 @@ RF24_INC := $(firstword $(wildcard /usr/include/RF24 /usr/local/include/RF24))
 
 all: check-deps $(BUILD_DIR)/$(APP)
 
-# ---- Dependency checks --------------------------------------------------------
+# ---- Dependency checks -------------------------------------------------------
 
 check-deps:
-	@command -v $(CC)  >/dev/null 2>&1 || \
-	  { echo "ERROR: $(CC) not found. Install build-essential: sudo apt-get install build-essential"; exit 1; }
-	@command -v xxd    >/dev/null 2>&1 || \
+	@command -v $(CC) >/dev/null 2>&1 || \
+	  { echo "ERROR: $(CC) not found. Install: sudo apt-get install build-essential"; exit 1; }
+	@command -v xxd >/dev/null 2>&1 || \
 	  { echo "ERROR: xxd not found. Install: sudo apt-get install xxd"; exit 1; }
 	@pkg-config --exists libcjson 2>/dev/null || \
-	  { echo "ERROR: cJSON library not found."; \
-	    echo "  Install: sudo apt-get install libcjson-dev"; exit 1; }
+	  { echo "ERROR: cJSON not found. Install: sudo apt-get install libcjson-dev"; exit 1; }
 	@test -n "$(RF24_INC)" || \
-	  { echo "ERROR: RF24 library headers not found."; \
-	    echo "  Install: see gateway/docs/INSTALL.md"; exit 1; }
+	  { echo "ERROR: RF24 headers not found. See gateway/docs/INSTALL.md"; exit 1; }
+	@test -f $(SACN_INC)/sacn/receiver.h || \
+	  { echo "ERROR: sACN headers not found at $(SACN_INC)/sacn/."; \
+	    echo "  Build from source: https://github.com/ETCLabs/sACN"; \
+	    echo "  See gateway/docs/INSTALL.md"; exit 1; }
+	@test -f $(SACN_LIB)/libsACN.a || \
+	  { echo "ERROR: libsACN.a not found at $(SACN_LIB)."; \
+	    echo "  Build from source: https://github.com/ETCLabs/sACN"; exit 1; }
 
 # ---- Embedded resource -------------------------------------------------------
 
@@ -65,21 +77,28 @@ $(RESOURCE_H): $(RESOURCE_JSON)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(RESOURCE_H)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(shell pkg-config --cflags libcjson 2>/dev/null) \
-	      -MMD -MP -I$(SRC_DIR) -c $< -o $@
+	$(CC) $(CFLAGS) $(CJSON_CFLAGS) \
+	      -I$(SRC_DIR) -I$(SACN_INC) \
+	      -MMD -MP -c $< -o $@
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp $(RESOURCE_H)
 	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -MMD -MP -I$(SRC_DIR) -I$(RF24_INC) -c $< -o $@
+	$(CXX) $(CXXFLAGS) \
+	       -I$(SRC_DIR) -I$(RF24_INC) -I$(SACN_INC) \
+	       -MMD -MP -c $< -o $@
 
 -include $(DEPS)
 
 # ---- Linking -----------------------------------------------------------------
+# Link order: sACN depends on EtcPal; both are static.
+# System libs: pthread (sACN threads), m (math), rt (clock_gettime on older libc)
 
 $(BUILD_DIR)/$(APP): $(OBJS)
-	$(CXX) $(LDFLAGS) $^ \
-	       $(shell pkg-config --libs libcjson 2>/dev/null || echo -lcjson) \
-	       -lrf24 -lpthread \
+	$(CXX) $^ \
+	       -L$(SACN_LIB) -lsACN -lEtcPal \
+	       -lrf24 \
+	       $(CJSON_LIBS) \
+	       -lpthread -lm -lrt \
 	       -o $@
 	@echo "Built: $@"
 
@@ -91,12 +110,12 @@ install: $(BUILD_DIR)/$(APP)
 	  install -m 644 $(RES_DIR)/default_config.json /etc/$(APP).json
 	install -m 644 systemd/$(APP).service /etc/systemd/system/
 	systemctl daemon-reload
-	@echo "Installed $(APP). Enable service with: systemctl enable --now $(APP)"
+	@echo "Installed $(APP). Enable with: systemctl enable --now $(APP)"
 
 # ---- Misc --------------------------------------------------------------------
 
 clean:
-	rm -rf $(BUILD_DIR) $(RESOURCE_H) $(DEPS)
+	rm -rf $(BUILD_DIR) $(RESOURCE_H)
 
 help:
 	@echo "Targets:"

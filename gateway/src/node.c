@@ -1,29 +1,37 @@
 #include "node.h"
 #include <string.h>
 
-bool node_apply_dmx(node_state_t *node, const uint8_t *dmx, uint16_t dmx_len)
+bool node_apply_dmx(node_state_t  *node,
+                    const uint8_t *dmx,
+                    uint16_t       slot_start,
+                    uint16_t       slot_count)
 {
-    uint16_t offset   = node->dmx_start - 1;  /* convert to 0-indexed */
-    uint8_t  channels = node->num_leds * 3;
+    uint8_t channels = node->num_leds * 3;
 
-    if (offset >= dmx_len)
-        return false;
+    /* Node occupies slots [dmx_start .. dmx_start + channels - 1] (1-indexed).
+     * The received buffer covers  [slot_start .. slot_start + slot_count - 1].
+     * Check for overlap. */
+    uint16_t node_end = node->dmx_start + channels - 1;
+    uint16_t slot_end = slot_start + slot_count - 1;
 
-    uint16_t available = dmx_len - offset;
+    if (node->dmx_start > slot_end || node_end < slot_start)
+        return false; /* no overlap */
+
+    /* Offset of the node's first channel within the dmx[] buffer */
+    uint16_t buf_offset = node->dmx_start - slot_start;
+
+    /* Number of channels we can actually copy */
+    uint16_t available = slot_count - buf_offset;
     if (available > channels)
         available = channels;
 
-    /* Compare first, avoid unnecessary write */
-    if (memcmp(node->rgb, dmx + offset, available) == 0 &&
-        (available == channels || memcmp(node->rgb + available,
-                                         "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-                                         "\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
-                                         channels - available) == 0)) {
-        return false;
-    }
+    uint8_t new_rgb[NODE_CHANNELS] = {0};
+    memcpy(new_rgb, dmx + buf_offset, available);
 
-    memset(node->rgb, 0, channels);
-    memcpy(node->rgb, dmx + offset, available);
+    if (memcmp(node->rgb, new_rgb, channels) == 0)
+        return false; /* no change */
+
+    memcpy(node->rgb, new_rgb, channels);
     node->initialized = true;
     return true;
 }

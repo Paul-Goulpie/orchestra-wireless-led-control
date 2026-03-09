@@ -1,0 +1,3 @@
+firmware/build/
+gateway/build/
+gateway/src/default_config_data.h

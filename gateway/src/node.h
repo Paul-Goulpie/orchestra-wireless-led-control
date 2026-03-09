@@ -40,11 +40,18 @@ typedef struct {
 } node_state_t;
 
 /*
- * Update node RGB from DMX slice.
- * dmx: full DMX universe buffer, dmx_len: number of channels in buffer.
- * Returns true if the RGB content changed.
+ * Update node RGB from a DMX slot buffer.
+ *
+ *   dmx        : pointer to slot values, dmx[0] corresponds to slot `slot_start`
+ *   slot_start : 1-indexed number of the first slot in dmx[] (from sACN slot_range)
+ *   slot_count : number of slots in dmx[]
+ *
+ * Returns true if the node's RGB content changed.
  */
-bool node_apply_dmx(node_state_t *node, const uint8_t *dmx, uint16_t dmx_len);
+bool node_apply_dmx(node_state_t  *node,
+                    const uint8_t *dmx,
+                    uint16_t       slot_start,
+                    uint16_t       slot_count);
 
 /* Build a radio packet reflecting current node RGB state. */
 void node_build_packet(node_state_t *node, node_packet_v1_t *pkt);

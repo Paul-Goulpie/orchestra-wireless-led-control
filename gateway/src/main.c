@@ -1,10 +1,11 @@
 /*
  * orchgateway — Orchestra Wireless LED Gateway
  *
- * Receives sACN (E1.31) DMX frames from QLC+ and forwards them as
- * NRF24L01+ radio packets to up to 60 wearable LED nodes.
+ * Receives sACN (E1.31) DMX frames from QLC+ via the ETC Labs sACN library
+ * and forwards them as NRF24L01+ radio packets to up to 60 wearable LED nodes.
  *
- * Usage: orchgateway [OPTIONS]
+ * The sACN library manages its own receiver thread. Node state is protected
+ * by a mutex shared between the sACN callback thread and the main loop.
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -15,10 +16,8 @@
 #include <getopt.h>
 #include <signal.h>
 #include <errno.h>
-#include <unistd.h>
-#include <sys/select.h>
-#include <sys/socket.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "config.h"
 #include "sacn.h"
@@ -32,7 +31,72 @@
 #define DEFAULT_CFG "/etc/orchgateway.json"
 
 /* -----------------------------------------------------------------------
- * Global state
+ * Shared state between sACN callback thread and main thread
+ * --------------------------------------------------------------------- */
+
+typedef struct {
+    app_config_t   *cfg;
+    pthread_mutex_t mutex;
+    int64_t         last_sacn_ms;  /* monotonic ms of last received data */
+    int             sacn_active;   /* 1 = at least one packet received */
+    int             timed_out;     /* 1 = blackout already sent */
+} gw_ctx_t;
+
+/* -----------------------------------------------------------------------
+ * Monotonic clock helper
+ * --------------------------------------------------------------------- */
+
+static int64_t mono_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+/* -----------------------------------------------------------------------
+ * sACN callbacks  (called from the sACN library's internal thread)
+ * --------------------------------------------------------------------- */
+
+static void on_universe_data(uint16_t        universe_id,
+                             const uint8_t  *dmx,
+                             uint16_t        slot_start,
+                             uint16_t        slot_count,
+                             void           *ctx)
+{
+    gw_ctx_t *gw = (gw_ctx_t *)ctx;
+
+    pthread_mutex_lock(&gw->mutex);
+
+    gw->last_sacn_ms = mono_ms();
+    gw->sacn_active  = 1;
+    gw->timed_out    = 0;
+    g_stats.sacn_rx++;
+
+    int matched = 0;
+    for (int i = 0; i < gw->cfg->num_nodes; i++) {
+        node_state_t *nd = &gw->cfg->nodes[i];
+        if (nd->universe_id != universe_id) continue;
+        matched++;
+        if (node_apply_dmx(nd, dmx, slot_start, slot_count))
+            nd->dirty = true;
+    }
+    if (!matched)
+        g_stats.sacn_skipped++;
+
+    pthread_mutex_unlock(&gw->mutex);
+}
+
+static void on_source_lost(uint16_t universe_id, void *ctx)
+{
+    /* The main loop handles the actual blackout via timeout detection.
+     * Just update stats here; the log is already printed by sacn.c. */
+    (void)universe_id;
+    (void)ctx;
+    g_stats.net_timeout_count++;
+}
+
+/* -----------------------------------------------------------------------
+ * Signal handling
  * --------------------------------------------------------------------- */
 
 static volatile int g_running = 1;
@@ -44,45 +108,7 @@ static void sig_handler(int sig)
 }
 
 /* -----------------------------------------------------------------------
- * Time helpers (monotonic, milliseconds)
- * --------------------------------------------------------------------- */
-
-static int64_t mono_ms(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
-
-/* -----------------------------------------------------------------------
- * Radio transmission with per-node frame_id management
- * --------------------------------------------------------------------- */
-
-static void tx_node(node_state_t *node, int blackout)
-{
-    node_packet_v1_t pkt;
-    if (blackout)
-        node_build_off_packet(node, &pkt);
-    else
-        node_build_packet(node, &pkt);
-
-    int ret = radio_send(&pkt, sizeof(pkt));
-    g_stats.radio_tx_total++;
-    if (ret != 0) {
-        g_stats.radio_tx_failed++;
-        LOG_WARN("TX failed: node %u (%s)", node->address, node->name);
-    } else {
-        LOG_DEBUG("TX node %u (%s) frame_id=%u%s",
-                  node->address, node->name, pkt.frame_id,
-                  blackout ? " [BLACKOUT]" : "");
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &node->last_tx);
-    node->dirty = false;
-}
-
-/* -----------------------------------------------------------------------
- * Help text
+ * Help
  * --------------------------------------------------------------------- */
 
 static void print_help(const char *prog)
@@ -106,21 +132,20 @@ static void print_help(const char *prog)
         "\n"
         "Data rates: 250kbps | 1mbps | 2mbps\n"
         "\n"
-        "Configuration file format: JSON (default: " DEFAULT_CFG ")\n"
-        "  If the file does not exist it is created with built-in defaults.\n"
+        "Configuration file: JSON (created with built-in defaults if absent).\n"
         "\n"
         "Examples:\n"
         "  %s -v -f /tmp/myconf.json\n"
         "  %s --channel 100 --repeat-count 2\n",
         prog,
-        "-h, --help",           "Show this help and exit",
-        "-V, --version",        "Show version and exit",
-        "-v, --verbose",        "Enable debug output",
-        "-f, --config FILE",    "Configuration file",
-        "-c, --channel N",      "RF channel override (0-125)",
-        "-R, --data-rate RATE", "RF data rate override",
-        "-r, --repeat-count N", "Extra TX repetitions per packet",
-        "-t, --sacn-timeout MS","sACN silence timeout in ms",
+        "-h, --help",            "Show this help and exit",
+        "-V, --version",         "Show version and exit",
+        "-v, --verbose",         "Enable debug output",
+        "-f, --config FILE",     "Configuration file",
+        "-c, --channel N",       "RF channel override (0-125)",
+        "-R, --data-rate RATE",  "RF data rate override",
+        "-r, --repeat-count N",  "Extra TX repetitions per packet",
+        "-t, --sacn-timeout MS", "sACN silence timeout in ms",
         "-s, --stats-interval S","Statistics print interval (seconds)",
         prog, prog);
 }
@@ -131,13 +156,13 @@ static void print_help(const char *prog)
 
 int main(int argc, char *argv[])
 {
-    const char *config_path  = DEFAULT_CFG;
-    int         verbose      = 0;
-    int         stats_ivl    = 30;    /* seconds */
-    int         ov_channel   = -1;
-    int         ov_repeat    = -1;
-    int         ov_timeout   = -1;
-    const char *ov_rate      = NULL;
+    const char *config_path = DEFAULT_CFG;
+    int         verbose     = 0;
+    int         stats_ivl   = 30;
+    int         ov_channel  = -1;
+    int         ov_repeat   = -1;
+    int         ov_timeout  = -1;
+    const char *ov_rate     = NULL;
 
     static const struct option long_opts[] = {
         { "help",           no_argument,       NULL, 'h' },
@@ -157,20 +182,19 @@ int main(int argc, char *argv[])
         switch (opt) {
         case 'h': print_help(argv[0]); return 0;
         case 'V': printf("%s %s\n", APP_NAME, APP_VERSION); return 0;
-        case 'v': verbose    = 1;      break;
-        case 'f': config_path = optarg; break;
-        case 'c': ov_channel = atoi(optarg); break;
-        case 'R': ov_rate    = optarg; break;
-        case 'r': ov_repeat  = atoi(optarg); break;
-        case 't': ov_timeout = atoi(optarg); break;
-        case 's': stats_ivl  = atoi(optarg); break;
+        case 'v': verbose     = 1;       break;
+        case 'f': config_path = optarg;  break;
+        case 'c': ov_channel  = atoi(optarg); break;
+        case 'R': ov_rate     = optarg;  break;
+        case 'r': ov_repeat   = atoi(optarg); break;
+        case 't': ov_timeout  = atoi(optarg); break;
+        case 's': stats_ivl   = atoi(optarg); break;
         default:  print_help(argv[0]); return 1;
         }
     }
 
     log_init(verbose);
     stats_init();
-
     LOG_INFO("%s v%s starting", APP_NAME, APP_VERSION);
 
     /* ---- Load configuration ---- */
@@ -180,13 +204,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Apply command-line overrides */
-    if (ov_channel >= 0 && ov_channel <= 125)
-        cfg.radio.channel = (uint8_t)ov_channel;
-    if (ov_repeat >= 0)
-        cfg.radio.repeat_count = ov_repeat;
-    if (ov_timeout >= 0)
-        cfg.sacn_timeout_ms = (uint32_t)ov_timeout;
+    if (ov_channel >= 0 && ov_channel <= 125) cfg.radio.channel      = (uint8_t)ov_channel;
+    if (ov_repeat  >= 0)                       cfg.radio.repeat_count = ov_repeat;
+    if (ov_timeout >= 0)                       cfg.sacn_timeout_ms    = (uint32_t)ov_timeout;
     if (ov_rate) {
         if      (strcmp(ov_rate, "250kbps") == 0) cfg.radio.data_rate = RADIO_RATE_250KBPS;
         else if (strcmp(ov_rate, "2mbps")   == 0) cfg.radio.data_rate = RADIO_RATE_2MBPS;
@@ -196,159 +216,144 @@ int main(int argc, char *argv[])
     config_print(&cfg);
 
     if (cfg.num_universes == 0) { LOG_ERROR("No universes configured"); return 1; }
-    if (cfg.num_nodes     == 0) { LOG_WARN("No nodes configured");             }
+    if (cfg.num_nodes     == 0) { LOG_WARN("No nodes configured"); }
 
-    /* ---- Open sACN sockets (one per unique port) ---- */
-    /* Track open sockets */
-    typedef struct { int fd; uint16_t port; } sock_entry_t;
-    sock_entry_t socks[CONFIG_MAX_UNIVERSES];
-    int num_socks = 0;
-    int max_fd    = -1;
+    /* ---- Shared gateway context (callback ↔ main loop) ---- */
+    gw_ctx_t gw = {0};
+    gw.cfg          = &cfg;
+    gw.last_sacn_ms = mono_ms();
+    pthread_mutex_init(&gw.mutex, NULL);
 
-    for (int i = 0; i < cfg.num_universes; i++) {
-        universe_cfg_t *u = &cfg.universes[i];
-
-        /* Find or create socket for this port */
-        int fd = -1;
-        for (int j = 0; j < num_socks; j++) {
-            if (socks[j].port == u->port) { fd = socks[j].fd; break; }
-        }
-        if (fd < 0) {
-            fd = sacn_socket_create(u->port);
-            if (fd < 0) {
-                LOG_ERROR("Cannot open socket for port %u (universe %u)", u->port, u->id);
-                continue;
-            }
-            socks[num_socks].fd   = fd;
-            socks[num_socks].port = u->port;
-            num_socks++;
-            if (fd > max_fd) max_fd = fd;
-        }
-
-        /* Join multicast group */
-        if (u->multicast[0])
-            sacn_socket_join(fd, u->multicast);
+    /* ---- Initialize sACN library ---- */
+    if (sacn_recv_init() != 0) {
+        LOG_ERROR("sACN initialization failed");
+        return 1;
     }
 
-    if (num_socks == 0) {
-        LOG_ERROR("No sACN sockets could be opened");
-        return 1;
+    /* Create one receiver per universe */
+    for (int i = 0; i < cfg.num_universes; i++) {
+        if (sacn_recv_add_universe(cfg.universes[i].id,
+                                   on_universe_data,
+                                   on_source_lost,
+                                   &gw) != 0) {
+            LOG_ERROR("Failed to create receiver for universe %u", cfg.universes[i].id);
+        }
     }
 
     /* ---- Initialize radio ---- */
     if (radio_init(&cfg.radio) != 0) {
         LOG_ERROR("Radio initialization failed");
+        sacn_recv_deinit();
         return 1;
     }
 
-    /* ---- Signal handlers ---- */
     signal(SIGINT,  sig_handler);
     signal(SIGTERM, sig_handler);
 
     LOG_INFO("Gateway running — %d node(s), %d universe(s). Ctrl-C to stop.",
              cfg.num_nodes, cfg.num_universes);
 
-    /* ---- Main loop state ---- */
-    int64_t last_sacn_ms    = mono_ms();
+    /* ---- Main loop ---- */
     int64_t last_refresh_ms = mono_ms();
     int64_t last_stats_ms   = mono_ms();
     int64_t stats_ivl_ms    = (int64_t)stats_ivl * 1000;
-    int     sacn_timed_out  = 0;
 
-    uint8_t rxbuf[1500];
+    /* Packets to send, collected under lock then transmitted outside */
+    node_packet_v1_t tx_queue[CONFIG_MAX_NODES];
+    int              tx_count = 0;
 
     while (g_running) {
 
-        /* Build fd_set from open sockets */
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        for (int i = 0; i < num_socks; i++)
-            FD_SET(socks[i].fd, &rfds);
-
-        /* Poll at most 50 ms so timers fire promptly */
-        struct timeval tv = { .tv_sec = 0, .tv_usec = 50000 };
-        int nready = select(max_fd + 1, &rfds, NULL, NULL, &tv);
-        if (nready < 0) {
-            if (errno == EINTR) continue;
-            LOG_ERROR("select: %s", strerror(errno));
-            break;
-        }
+        /* Sleep 50 ms between iterations (sACN lib threads handle reception) */
+        struct timespec sleep_ts = { .tv_sec = 0, .tv_nsec = 50000000L };
+        nanosleep(&sleep_ts, NULL);
 
         int64_t now = mono_ms();
 
-        /* ---- Receive sACN packets ---- */
-        if (nready > 0) {
-            for (int i = 0; i < num_socks; i++) {
-                if (!FD_ISSET(socks[i].fd, &rfds)) continue;
+        /* ---- Collect dirty nodes and check timeout (under lock) ---- */
+        tx_count = 0;
+        int send_blackout = 0;
 
-                ssize_t len = recv(socks[i].fd, rxbuf, sizeof(rxbuf), 0);
-                if (len <= 0) continue;
+        pthread_mutex_lock(&gw.mutex);
 
-                sacn_packet_t sp;
-                if (sacn_parse(rxbuf, (size_t)len, &sp) != 0) continue;
+        int64_t sacn_age_ms = now - gw.last_sacn_ms;
 
-                g_stats.sacn_rx++;
-                last_sacn_ms   = now;
-                sacn_timed_out = 0;
-
-                LOG_DEBUG("sACN univ=%u seq=%u ch=%u",
-                          sp.universe, sp.sequence, sp.dmx_count);
-
-                /* Apply to all matching nodes */
-                int matched = 0;
-                for (int j = 0; j < cfg.num_nodes; j++) {
-                    node_state_t *nd = &cfg.nodes[j];
-                    if (nd->universe_id != sp.universe) continue;
-                    matched++;
-                    if (node_apply_dmx(nd, sp.dmx, sp.dmx_count))
-                        nd->dirty = true;
-                }
-                if (!matched)
-                    g_stats.sacn_skipped++;
+        if (gw.sacn_active &&
+            !gw.timed_out  &&
+            sacn_age_ms > (int64_t)cfg.sacn_timeout_ms) {
+            LOG_WARN("sACN timeout after %.1f s — sending blackout",
+                     (double)sacn_age_ms / 1000.0);
+            gw.timed_out = 1;
+            send_blackout = 1;
+            /* Reset node state */
+            for (int i = 0; i < cfg.num_nodes; i++) {
+                memset(cfg.nodes[i].rgb, 0, NODE_CHANNELS);
+                cfg.nodes[i].initialized = false;
+                cfg.nodes[i].dirty       = false;
             }
         }
 
-        /* ---- Transmit dirty nodes (differential) ---- */
-        for (int i = 0; i < cfg.num_nodes; i++) {
-            node_state_t *nd = &cfg.nodes[i];
-            if (nd->dirty) {
-                tx_node(nd, 0);
-                /* Log if we could not keep up (packet was already superseded) */
+        if (!send_blackout) {
+            for (int i = 0; i < cfg.num_nodes; i++) {
+                node_state_t *nd = &cfg.nodes[i];
                 if (nd->dirty) {
-                    LOG_INFO("[%lldms] Skipped queued update for node %u (%s) univ=%u",
-                             (long long)now, nd->address, nd->name, nd->universe_id);
-                    g_stats.sacn_skipped++;
+                    node_build_packet(nd, &tx_queue[tx_count++]);
                     nd->dirty = false;
                 }
             }
         }
 
-        /* ---- sACN timeout → blackout ---- */
-        if (!sacn_timed_out &&
-            (now - last_sacn_ms) > (int64_t)cfg.sacn_timeout_ms) {
-            LOG_WARN("sACN timeout after %.1f s — sending blackout",
-                     (double)(now - last_sacn_ms) / 1000.0);
-            g_stats.net_timeout_count++;
-            sacn_timed_out = 1;
+        pthread_mutex_unlock(&gw.mutex);
+
+        /* ---- Transmit (outside lock to minimise contention) ---- */
+        if (send_blackout) {
             for (int i = 0; i < cfg.num_nodes; i++) {
-                node_state_t *nd = &cfg.nodes[i];
-                tx_node(nd, 1);                   /* all-off packet */
-                memset(nd->rgb, 0, NODE_CHANNELS); /* update buffer too */
-                nd->initialized = false;
+                node_packet_v1_t pkt;
+                node_build_off_packet(&cfg.nodes[i], &pkt);
+                if (radio_send(&pkt, sizeof(pkt)) == 0)
+                    g_stats.radio_tx_total++;
+                else {
+                    g_stats.radio_tx_total++;
+                    g_stats.radio_tx_failed++;
+                    LOG_WARN("TX blackout failed: node %u", cfg.nodes[i].address);
+                }
+            }
+        } else {
+            for (int i = 0; i < tx_count; i++) {
+                int ret = radio_send(&tx_queue[i], sizeof(tx_queue[i]));
+                g_stats.radio_tx_total++;
+                if (ret != 0) {
+                    g_stats.radio_tx_failed++;
+                    LOG_WARN("TX failed: node %u", tx_queue[i].dst_addr);
+                } else {
+                    LOG_DEBUG("TX node %u frame_id=%u",
+                              tx_queue[i].dst_addr, tx_queue[i].frame_id);
+                }
             }
         }
 
-        /* ---- Periodic refresh (re-send current state to all nodes) ---- */
+        /* ---- Periodic refresh ---- */
         if ((now - last_refresh_ms) >= (int64_t)cfg.refresh_interval_ms) {
             last_refresh_ms = now;
-            if (!sacn_timed_out) {
+
+            pthread_mutex_lock(&gw.mutex);
+            int refresh_count = 0;
+            node_packet_v1_t refresh_queue[CONFIG_MAX_NODES];
+            if (!gw.timed_out) {
                 for (int i = 0; i < cfg.num_nodes; i++) {
                     node_state_t *nd = &cfg.nodes[i];
-                    if (!nd->dirty && nd->initialized) {
-                        tx_node(nd, 0);
-                        g_stats.radio_refresh_total++;
-                    }
+                    if (!nd->dirty && nd->initialized)
+                        node_build_packet(nd, &refresh_queue[refresh_count++]);
                 }
+            }
+            pthread_mutex_unlock(&gw.mutex);
+
+            for (int i = 0; i < refresh_count; i++) {
+                int ret = radio_send(&refresh_queue[i], sizeof(refresh_queue[i]));
+                g_stats.radio_tx_total++;
+                g_stats.radio_refresh_total++;
+                if (ret != 0)
+                    g_stats.radio_tx_failed++;
             }
         }
 
@@ -361,12 +366,15 @@ int main(int argc, char *argv[])
 
     /* ---- Graceful shutdown ---- */
     LOG_INFO("Shutting down — sending blackout...");
-    for (int i = 0; i < cfg.num_nodes; i++)
-        tx_node(&cfg.nodes[i], 1);
+    for (int i = 0; i < cfg.num_nodes; i++) {
+        node_packet_v1_t pkt;
+        node_build_off_packet(&cfg.nodes[i], &pkt);
+        radio_send(&pkt, sizeof(pkt));
+    }
 
+    sacn_recv_deinit();
     radio_close();
-    for (int i = 0; i < num_socks; i++)
-        close(socks[i].fd);
+    pthread_mutex_destroy(&gw.mutex);
 
     stats_print();
     LOG_INFO("Goodbye.");

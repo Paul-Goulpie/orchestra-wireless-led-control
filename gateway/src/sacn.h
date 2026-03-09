@@ -2,38 +2,49 @@
 #define SACN_H
 
 #include <stdint.h>
-#include <stddef.h>
-
-#define SACN_PORT       5568
-#define SACN_MAX_DMX    512
-
-/* Parsed sACN (E1.31) data packet */
-typedef struct {
-    uint16_t universe;
-    uint8_t  sequence;
-    uint8_t  priority;
-    uint16_t dmx_count;
-    uint8_t  dmx[SACN_MAX_DMX];
-} sacn_packet_t;
 
 /*
- * Parse raw UDP payload into sacn_packet_t.
- * Returns 0 on success, -1 if the packet is invalid or not a DMX data packet.
+ * Thin wrapper around the ETC Labs sACN library (libsACN).
+ *
+ * The library manages its own receiver thread internally.
+ * Callbacks are invoked from that thread — protect shared state with a mutex.
  */
-int sacn_parse(const uint8_t *data, size_t len, sacn_packet_t *out);
 
 /*
- * Create a UDP socket bound to the given port (INADDR_ANY).
- * Returns fd >= 0 on success, -1 on error.
+ * Called when DMX data is received on a universe.
+ *
+ *   universe_id   : sACN universe number
+ *   dmx           : pointer to DMX slot values (dmx[0] = slot `slot_start`)
+ *   slot_start    : 1-indexed number of the first slot in dmx[]
+ *   slot_count    : number of slots in dmx[]
+ *   ctx           : user context pointer
  */
-int sacn_socket_create(uint16_t port);
+typedef void (*sacn_data_cb_t)(uint16_t        universe_id,
+                               const uint8_t  *dmx,
+                               uint16_t        slot_start,
+                               uint16_t        slot_count,
+                               void           *ctx);
 
 /*
- * Join a multicast group on an existing socket.
- * addr_str is dotted-decimal, e.g. "239.255.0.1".
- * Safe to call with a unicast address (no-op).
- * Returns 0 on success, -1 on error.
+ * Called when all known sources for a universe have been lost
+ * (timeout or Stream_Terminated).
  */
-int sacn_socket_join(int fd, const char *addr_str);
+typedef void (*sacn_lost_cb_t)(uint16_t universe_id, void *ctx);
+
+/* Initialize the sACN library. Call once at startup. Returns 0 on success. */
+int  sacn_recv_init(void);
+
+/*
+ * Create a receiver for `universe_id`.
+ * `data_cb` and `lost_cb` are called from the library's internal thread.
+ * Returns 0 on success, -1 on failure.
+ */
+int  sacn_recv_add_universe(uint16_t      universe_id,
+                            sacn_data_cb_t data_cb,
+                            sacn_lost_cb_t lost_cb,
+                            void          *ctx);
+
+/* Destroy all receivers and deinitialize the sACN library. */
+void sacn_recv_deinit(void);
 
 #endif /* SACN_H */
