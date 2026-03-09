@@ -76,7 +76,7 @@ def generate(num_musicians: int) -> dict:
             "channel":      76,
             "data_rate":    "1mbps",
             "repeat_count": 1,
-            "irq_pin":      -1,
+            "irq_pin":      24,
         },
         "network": {
             "sacn_timeout_ms":     2000,
