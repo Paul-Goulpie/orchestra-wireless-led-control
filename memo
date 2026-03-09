@@ -1,3 +1,5 @@
+# 1
+
 En lisant le Readme.md
 
 
@@ -52,6 +54,7 @@ Rédige également un document - résumant l'architecture.
 
 --------------------------------------
 
+# 2
 
 Fait évoluer la solution existante
 En passant le débit de 250kbps à 1Mbps
@@ -88,6 +91,8 @@ En cas de non présence de arduino-cli (detecté via Makefile) affiche les info 
 Ajoute une mention d'install de arduino-cli dans les documents.
 
 --------------------------------------
+
+# 3
 
 Maintenant on passe à l'implémentation coté gateway
 
