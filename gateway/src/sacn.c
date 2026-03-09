@@ -61,6 +61,12 @@ static void on_universe_data(sacn_receiver_t            handle,
                    e->ctx);
 }
 
+static void on_sampling_period_ended(sacn_receiver_t handle, uint16_t universe, void *ctx)
+{
+    (void)handle; (void)universe; (void)ctx;
+    /* sampling period end — no action needed */
+}
+
 static void on_sources_lost(sacn_receiver_t    handle,
                             uint16_t           universe,
                             const SacnLostSource *lost_sources,
@@ -116,9 +122,10 @@ int sacn_recv_add_universe(uint16_t       universe_id,
     SacnReceiverConfig cfg;
     sacn_receiver_config_init(&cfg);
     cfg.universe_id                   = universe_id;
-    cfg.callbacks.universe_data       = on_universe_data;
-    cfg.callbacks.sources_lost        = on_sources_lost;
-    cfg.callbacks.context             = &g_entries[idx];
+    cfg.callbacks.universe_data        = on_universe_data;
+    cfg.callbacks.sources_lost         = on_sources_lost;
+    cfg.callbacks.sampling_period_ended = on_sampling_period_ended;
+    cfg.callbacks.context              = &g_entries[idx];
     cfg.flags                         = kSacnReceiverOptsFilterPreviewData;
     cfg.ip_supported                  = kSacnIpV4Only;
 
