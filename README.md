@@ -19,10 +19,10 @@ node per lighting tick.
 ## System Architecture
 
 ```
-QLC+ (DMX / Art-Net / sACN)
-        |  Ethernet
-  Gateway (Raspberry Pi + NRF24L01+)
-        |  2.4 GHz broadcast — 1 Mbps
+QLC+ (DMX / sACN — E1.31 unicast or multicast)
+        |  Ethernet / Wi-Fi
+  orchgateway (Orange Pi Zero 3 + NRF24L01+PA+LNA)
+        |  2.4 GHz broadcast — 1 Mbps, channel 76
   Up to 60 × RF-Nano Nodes
         |
   WS2812B LED strips (10 LEDs / node)
@@ -48,8 +48,8 @@ QLC+ (DMX / Art-Net / sACN)
 
 ### Gateway
 
-- Raspberry Pi (any model with GPIO)
-- NRF24L01+ module
+- Orange Pi Zero 3 (aarch64, Debian/Armbian)
+- NRF24L01+PA+LNA module (SPI)
 
 ### Node (per musician)
 
@@ -83,7 +83,38 @@ See [docs/architecture.md](docs/architecture.md) for full protocol details.
 
 ------------------------------------------------------------------------
 
-## Quick Start
+## Quick Start — Gateway
+
+### 1. Install dependencies and build
+
+```bash
+sudo apt-get install build-essential xxd libcjson-dev cmake git
+# Build RF24 library — see gateway/docs/INSTALL.md
+cd gateway
+make
+sudo make install
+```
+
+### 2. Configure
+
+Edit `/etc/orchgateway.json` to declare your nodes and universes.
+See `gateway/resources/default_config.json` for the full format.
+
+### 3. Run
+
+```bash
+orchgateway -v                          # verbose, default config
+orchgateway -f /path/to/config.json    # custom config
+sudo systemctl enable --now orchgateway # run as systemd service
+```
+
+### 4. SPI wiring
+
+See [gateway/docs/spi-wiring.md](gateway/docs/spi-wiring.md).
+
+---
+
+## Quick Start — Node firmware
 
 ### 1. Install arduino-cli
 
@@ -111,10 +142,13 @@ make monitor PORT=/dev/ttyUSB0   # view UART logs at 115200 baud
 ## Repository Structure
 
 ```
-/firmware   → Arduino Nano node firmware + Makefile
-/gateway    → DMX receiver + RF broadcaster (Raspberry Pi)
-/docs       → Protocol specification and architecture
-/hardware   → Schematics and wiring diagrams
+/firmware       → Arduino Nano node firmware + Makefile
+/gateway        → orchgateway — sACN receiver + NRF24 broadcaster
+  /src          → C/C++ source files
+  /resources    → default_config.json (embedded in binary)
+  /docs         → spi-wiring.md, INSTALL.md
+  /systemd      → orchgateway.service
+/docs           → Protocol specification and architecture
 ```
 
 ------------------------------------------------------------------------

@@ -1,0 +1,32 @@
+[Unit]
+Description=Orchestra Wireless LED Gateway
+Documentation=file:/usr/share/doc/orchgateway/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/orchgateway --config /etc/orchgateway.json
+Restart=on-failure
+RestartSec=5s
+
+# Run as root for SPI/GPIO access (or replace with a dedicated user that has
+# access to /dev/spidev* and /dev/gpio* via udev rules)
+User=root
+
+# Standard output → journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orchgateway
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/etc /var/lib/orchgateway
+DeviceAllow=/dev/spidev0.0 rw
+DeviceAllow=/dev/gpiochip0 rw
+
+[Install]
+WantedBy=multi-user.target

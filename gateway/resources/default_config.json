@@ -1,0 +1,51 @@
+{
+  "radio": {
+    "spi_device": "/dev/spidev0.0",
+    "spi_speed_hz": 10000000,
+    "ce_pin": 25,
+    "channel": 76,
+    "data_rate": "1mbps",
+    "repeat_count": 1
+  },
+  "network": {
+    "sacn_timeout_ms": 2000,
+    "refresh_interval_ms": 1000
+  },
+  "nodes": [
+    {
+      "name": "musician_01",
+      "address": 1,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 1
+    },
+    {
+      "name": "musician_02",
+      "address": 2,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 31
+    },
+    {
+      "name": "musician_03",
+      "address": 3,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 61
+    }
+  ],
+  "universes": [
+    {
+      "name": "universe_1",
+      "id": 1,
+      "multicast": "239.255.0.1",
+      "port": 5568
+    },
+    {
+      "name": "universe_2",
+      "id": 2,
+      "multicast": "239.255.0.2",
+      "port": 5568
+    }
+  ]
+}

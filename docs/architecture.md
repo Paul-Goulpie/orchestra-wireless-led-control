@@ -3,22 +3,24 @@
 ## System overview
 
 ```
-QLC+ (DMX / Art-Net / sACN)
+QLC+ (sACN / E1.31 — unicast or multicast UDP port 5568)
         |
-    Ethernet
+    Ethernet / Wi-Fi
         |
-  Gateway (Raspberry Pi + NRF24L01+)
+  orchgateway  (Orange Pi Zero 3 + NRF24L01+PA+LNA via SPI)
         |
-   2.4 GHz broadcast  (1 Mbps, channel 76)
+   2.4 GHz broadcast  (1 Mbps, channel 76, no ACK)
         |
   Up to 60 x Arduino Nano Nodes (RF-Nano)
         |
   WS2812B LED strip (10 LEDs / node)
 ```
 
-The gateway receives DMX universes from QLC+ and sends one 32-byte radio
-frame per node per lighting frame. Each node filters on its own address
-and applies the embedded RGB data directly to the LED strip.
+The gateway receives DMX universes from QLC+ via sACN (E1.31) and sends
+one 32-byte radio frame per node. Only nodes whose RGB values have changed
+receive an immediate update (differential mode); all other nodes are
+refreshed once per second. Each node filters on its own address and applies
+the embedded RGB data directly to the LED strip.
 
 ---
 
@@ -185,7 +187,97 @@ instructions automatically.
 
 ## Libraries
 
+### Node (Arduino)
+
 | Library | Purpose | Install name |
 |---------|---------|-------------|
 | FastLED | WS2812B control | `FastLED` |
 | RF24    | NRF24L01+ driver | `RF24` |
+
+### Gateway (Linux / C)
+
+| Library | Purpose | Install |
+|---------|---------|---------|
+| RF24    | NRF24L01+ Linux driver (C++) | build from source — see `gateway/docs/INSTALL.md` |
+| cJSON   | JSON config parsing | `sudo apt-get install libcjson-dev` |
+
+---
+
+## Gateway — orchgateway
+
+### Configuration file (`/etc/orchgateway.json`)
+
+JSON file with three sections:
+
+```jsonc
+{
+  "radio": {
+    "spi_device":   "/dev/spidev0.0",   // SPI bus device
+    "spi_speed_hz": 10000000,            // SPI clock speed (max 10 MHz)
+    "ce_pin":       25,                  // GPIO BCM pin for NRF24 CE
+    "channel":      76,                  // RF channel (0-125)
+    "data_rate":    "1mbps",             // "250kbps" | "1mbps" | "2mbps"
+    "repeat_count": 1                    // extra TX repetitions per packet
+  },
+  "network": {
+    "sacn_timeout_ms":     2000,         // silence → blackout threshold
+    "refresh_interval_ms": 1000          // periodic re-send interval
+  },
+  "universes": [
+    { "name": "universe_1", "id": 1, "multicast": "239.255.0.1", "port": 5568 }
+  ],
+  "nodes": [
+    {
+      "name":        "musician_01",
+      "address":     1,                  // 1-63
+      "num_leds":    10,
+      "universe_id": 1,                  // which sACN universe carries this node
+      "dmx_start":   1                   // 1-indexed DMX channel in the universe
+    }
+  ]
+}
+```
+
+### DMX channel mapping
+
+Each node occupies `num_leds × 3` consecutive DMX channels starting at
+`dmx_start` within `universe_id`.
+
+```
+Node address 1: universe 1, channels 1-30   (10 LEDs)
+Node address 2: universe 1, channels 31-60
+...
+Node address 17: universe 1, channels 481-510
+Node address 18: universe 2, channels 1-30   (new universe)
+```
+
+Use QLC+ to map fixtures to the appropriate universe/start-channel.
+
+### Sending strategy
+
+1. **Differential**: when a sACN packet arrives and changes a node's RGB
+   state, that node is immediately transmitted via radio.
+2. **Refresh**: every `refresh_interval_ms` (default 1 s), all nodes that
+   have been initialised but have no pending update are re-sent to
+   compensate for any missed radio frames.
+3. **Blackout**: if no sACN packet arrives within `sacn_timeout_ms`
+   (default 2 s), all-zero packets are sent to every node.
+
+### Radio parameters (gateway TX)
+
+| Parameter | Value |
+|-----------|-------|
+| Pipe address | `0xE8E8F0F0E1` (matches node RX pipe) |
+| Auto-ACK | Disabled (broadcast) |
+| PA level | MAX |
+| Payload | 32 bytes fixed |
+| Repeats | 1 + `repeat_count` sends per packet |
+
+### Statistics (logged every 30 s)
+
+- `sacn_rx` — sACN packets received
+- `sacn_skipped` — packets with no matching node / superseded
+- `net_timeout_count` — number of sACN timeout events
+- `radio_tx_total` — total radio packets transmitted
+- `radio_tx_failed` — transmission failures
+- `radio_refresh_total` — refresh packets sent
