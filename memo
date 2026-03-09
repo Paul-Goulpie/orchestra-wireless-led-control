@@ -154,4 +154,8 @@ La stratégie d'envoi ne consiste pas à envoyer tout les paquets emis par QLC+ 
 
 Le soft génère des logs et des stats (nombre paquets sACN reçu, perte réseau , stat paquets perdu  / sACN et  radio , etc...).
 
+Utilise des libs pour Json
+Utilise des libs pour RF24
+Utilise des libs pour sACN
+
 Si j'ai oublié des éléments , rajoute les.
