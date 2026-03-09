@@ -11,6 +11,32 @@
     "sacn_timeout_ms": 2000,
     "refresh_interval_ms": 1000
   },
+  "universes": [
+    {
+      "name": "universe_1",
+      "id": 1,
+      "multicast": "239.255.0.1",
+      "port": 5568
+    },
+    {
+      "name": "universe_2",
+      "id": 2,
+      "multicast": "239.255.0.2",
+      "port": 5568
+    },
+    {
+      "name": "universe_3",
+      "id": 3,
+      "multicast": "239.255.0.3",
+      "port": 5568
+    },
+    {
+      "name": "universe_4",
+      "id": 4,
+      "multicast": "239.255.0.4",
+      "port": 5568
+    }
+  ],
   "nodes": [
     {
       "name": "musician_01",
@@ -32,20 +58,405 @@
       "num_leds": 10,
       "universe_id": 1,
       "dmx_start": 61
-    }
-  ],
-  "universes": [
-    {
-      "name": "universe_1",
-      "id": 1,
-      "multicast": "239.255.0.1",
-      "port": 5568
     },
     {
-      "name": "universe_2",
-      "id": 2,
-      "multicast": "239.255.0.2",
-      "port": 5568
+      "name": "musician_04",
+      "address": 4,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 91
+    },
+    {
+      "name": "musician_05",
+      "address": 5,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 121
+    },
+    {
+      "name": "musician_06",
+      "address": 6,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 151
+    },
+    {
+      "name": "musician_07",
+      "address": 7,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 181
+    },
+    {
+      "name": "musician_08",
+      "address": 8,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 211
+    },
+    {
+      "name": "musician_09",
+      "address": 9,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 241
+    },
+    {
+      "name": "musician_10",
+      "address": 10,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 271
+    },
+    {
+      "name": "musician_11",
+      "address": 11,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 301
+    },
+    {
+      "name": "musician_12",
+      "address": 12,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 331
+    },
+    {
+      "name": "musician_13",
+      "address": 13,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 361
+    },
+    {
+      "name": "musician_14",
+      "address": 14,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 391
+    },
+    {
+      "name": "musician_15",
+      "address": 15,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 421
+    },
+    {
+      "name": "musician_16",
+      "address": 16,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 451
+    },
+    {
+      "name": "musician_17",
+      "address": 17,
+      "num_leds": 10,
+      "universe_id": 1,
+      "dmx_start": 481
+    },
+    {
+      "name": "musician_18",
+      "address": 18,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 1
+    },
+    {
+      "name": "musician_19",
+      "address": 19,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 31
+    },
+    {
+      "name": "musician_20",
+      "address": 20,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 61
+    },
+    {
+      "name": "musician_21",
+      "address": 21,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 91
+    },
+    {
+      "name": "musician_22",
+      "address": 22,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 121
+    },
+    {
+      "name": "musician_23",
+      "address": 23,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 151
+    },
+    {
+      "name": "musician_24",
+      "address": 24,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 181
+    },
+    {
+      "name": "musician_25",
+      "address": 25,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 211
+    },
+    {
+      "name": "musician_26",
+      "address": 26,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 241
+    },
+    {
+      "name": "musician_27",
+      "address": 27,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 271
+    },
+    {
+      "name": "musician_28",
+      "address": 28,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 301
+    },
+    {
+      "name": "musician_29",
+      "address": 29,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 331
+    },
+    {
+      "name": "musician_30",
+      "address": 30,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 361
+    },
+    {
+      "name": "musician_31",
+      "address": 31,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 391
+    },
+    {
+      "name": "musician_32",
+      "address": 32,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 421
+    },
+    {
+      "name": "musician_33",
+      "address": 33,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 451
+    },
+    {
+      "name": "musician_34",
+      "address": 34,
+      "num_leds": 10,
+      "universe_id": 2,
+      "dmx_start": 481
+    },
+    {
+      "name": "musician_35",
+      "address": 35,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 1
+    },
+    {
+      "name": "musician_36",
+      "address": 36,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 31
+    },
+    {
+      "name": "musician_37",
+      "address": 37,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 61
+    },
+    {
+      "name": "musician_38",
+      "address": 38,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 91
+    },
+    {
+      "name": "musician_39",
+      "address": 39,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 121
+    },
+    {
+      "name": "musician_40",
+      "address": 40,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 151
+    },
+    {
+      "name": "musician_41",
+      "address": 41,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 181
+    },
+    {
+      "name": "musician_42",
+      "address": 42,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 211
+    },
+    {
+      "name": "musician_43",
+      "address": 43,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 241
+    },
+    {
+      "name": "musician_44",
+      "address": 44,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 271
+    },
+    {
+      "name": "musician_45",
+      "address": 45,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 301
+    },
+    {
+      "name": "musician_46",
+      "address": 46,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 331
+    },
+    {
+      "name": "musician_47",
+      "address": 47,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 361
+    },
+    {
+      "name": "musician_48",
+      "address": 48,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 391
+    },
+    {
+      "name": "musician_49",
+      "address": 49,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 421
+    },
+    {
+      "name": "musician_50",
+      "address": 50,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 451
+    },
+    {
+      "name": "musician_51",
+      "address": 51,
+      "num_leds": 10,
+      "universe_id": 3,
+      "dmx_start": 481
+    },
+    {
+      "name": "musician_52",
+      "address": 52,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 1
+    },
+    {
+      "name": "musician_53",
+      "address": 53,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 31
+    },
+    {
+      "name": "musician_54",
+      "address": 54,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 61
+    },
+    {
+      "name": "musician_55",
+      "address": 55,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 91
+    },
+    {
+      "name": "musician_56",
+      "address": 56,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 121
+    },
+    {
+      "name": "musician_57",
+      "address": 57,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 151
+    },
+    {
+      "name": "musician_58",
+      "address": 58,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 181
+    },
+    {
+      "name": "musician_59",
+      "address": 59,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 211
+    },
+    {
+      "name": "musician_60",
+      "address": 60,
+      "num_leds": 10,
+      "universe_id": 4,
+      "dmx_start": 241
     }
   ]
 }
