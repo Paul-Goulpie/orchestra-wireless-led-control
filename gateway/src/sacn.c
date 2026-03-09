@@ -85,14 +85,15 @@ static void on_sources_lost(sacn_receiver_t    handle,
  * Public API
  * --------------------------------------------------------------------- */
 
-int sacn_recv_init(void)
+int sacn_recv_init(uint32_t source_timeout_ms)
 {
     etcpal_error_t err = sacn_init(NULL, NULL);
     if (err != kEtcPalErrOk) {
         LOG_ERROR("sacn_init: %s", etcpal_strerror(err));
         return -1;
     }
-    LOG_INFO("sACN library initialized");
+    sacn_receiver_set_expired_wait(source_timeout_ms);
+    LOG_INFO("sACN library initialized (source timeout: %u ms)", source_timeout_ms);
     return 0;
 }
 
