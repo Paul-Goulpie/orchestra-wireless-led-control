@@ -1,9 +1,4 @@
-# NRF24L01+PA+LNA — SPI Wiring for Orange Pi Zero 3
-
-## Orange Pi Zero 3 GPIO header (26-pin)
-
-The Orange Pi Zero 3 exposes SPI0 on its 26-pin GPIO header.
-All signals are **3.3 V logic**; the NRF24L01+ module also runs at 3.3 V.
+# NRF24L01+PA+LNA — SPI Wiring
 
 > **Warning:** The NRF24L01+PA+LNA module has a separate VCC pin that can
 > accept 3.3 V or 5 V (check your specific module). Use a **3.3 V** supply
@@ -11,36 +6,39 @@ All signals are **3.3 V logic**; the NRF24L01+ module also runs at 3.3 V.
 
 ---
 
-## Pin mapping
+## Orange Pi Zero 3 (default target)
 
-| NRF24L01+ pin | Signal | OPi Zero 3 header pin | OPi GPIO (BCM-style) | Notes |
+The Orange Pi Zero 3 exposes SPI0 on its 26-pin GPIO header.
+All signals are **3.3 V logic**.
+
+### Pin mapping
+
+| NRF24L01+ pin | Signal | OPi header pin | OPi GPIO | Notes |
 |:---:|---|:---:|---|---|
-| 1 | GND   | 6  | GND       | Ground |
-| 2 | VCC   | 1  | 3.3 V     | 3.3 V supply |
-| 3 | CE    | 22 | **PA0 / GPIO 0** | Configurable — see below |
-| 4 | CSN   | 24 | SPI0_CS0  | Chip Select (hardware SPI) |
-| 5 | SCK   | 23 | SPI0_CLK  | SPI clock |
-| 6 | MOSI  | 19 | SPI0_MOSI | SPI data out |
-| 7 | MISO  | 21 | SPI0_MISO | SPI data in |
-| 8 | IRQ   | 18 | **PC6 / GPIO 70** | Optional — interrupt-driven TX (active LOW) |
+| 1 | GND  |  6 | GND           | Ground |
+| 2 | VCC  |  1 | 3.3 V         | 3.3 V supply |
+| 3 | CE   | 22 | **PA0 / GPIO 0**  | Chip Enable |
+| 4 | CSN  | 24 | SPI0_CS0      | Chip Select (hardware SPI) |
+| 5 | SCK  | 23 | SPI0_CLK      | SPI clock |
+| 6 | MOSI | 19 | SPI0_MOSI     | SPI data out |
+| 7 | MISO | 21 | SPI0_MISO     | SPI data in |
+| 8 | IRQ  | 18 | **PC6 / GPIO 70** | Interrupt — active LOW |
 
-> **CE pin:** PA0 corresponds to GPIO number **0** in the sysfs/libgpiod
-> numbering on the OPi Zero 3. Update `ce_pin` in `orchgateway.json`.
-> You can use any free GPIO — just pick a convenient one and update the
-> config accordingly.
->
-> **IRQ pin:** connecting the NRF24L01+ IRQ output (active LOW, open-drain)
-> to a free GPIO enables interrupt-driven TX mode.
-> Suggested pin: header pin **18** → OPi GPIO **70** (PC6).
-> Leave `"irq_pin": -1` in the config to keep the blocking fallback.
+### Default config values (OPi Zero 3)
 
----
+```json
+"radio": {
+  "spi_device":   "/dev/spidev0.0",
+  "spi_speed_hz": 10000000,
+  "ce_pin":       0,
+  "channel":      76,
+  "data_rate":    "1mbps",
+  "repeat_count": 1,
+  "irq_pin":      70
+}
+```
 
-## SPI device
-
-The SPI bus appears as `/dev/spidev0.0` once the SPI overlay is enabled.
-
-### Enable SPI on Orange Pi Zero 3 (Debian / armbian)
+### Enable SPI (Debian / Armbian)
 
 ```bash
 # Add to /boot/armbianEnv.txt (or /boot/orangepiEnv.txt):
@@ -62,51 +60,55 @@ ls -l /dev/spidev0.0
 
 ---
 
-## Default orchgateway.json radio section
+## Raspberry Pi (reference)
+
+| NRF24L01+ pin | Signal | RPi header pin | BCM GPIO | Notes |
+|:---:|---|:---:|:---:|---|
+| 1 | GND  | 20 | GND      | Ground |
+| 2 | VCC  |  1 | 3.3 V    | 3.3 V supply |
+| 3 | CE   | 22 | **25**   | Chip Enable |
+| 4 | CSN  | 24 | 8 (CE0)  | Chip Select (hardware SPI) |
+| 5 | SCK  | 23 | 11       | SPI clock |
+| 6 | MOSI | 19 | 10       | SPI data out |
+| 7 | MISO | 21 | 9        | SPI data in |
+| 8 | IRQ  | 18 | **24**   | Interrupt — active LOW |
+
+### Config values (RPi)
 
 ```json
 "radio": {
   "spi_device":   "/dev/spidev0.0",
   "spi_speed_hz": 10000000,
-  "ce_pin":       0,
+  "ce_pin":       25,
   "channel":      76,
   "data_rate":    "1mbps",
   "repeat_count": 1,
-  "irq_pin":      -1
+  "irq_pin":      24
 }
 ```
 
-Set `"irq_pin"` to the BCM/sysfs GPIO number of the pin connected to the
-NRF24L01+ IRQ output to enable interrupt-driven TX (e.g. `70` for OPi Zero 3
-header pin 18, or `24` for RPi BCM 24). Keep `-1` for blocking TX (no wiring
-required).
+---
+
+## IRQ pin — interrupt-driven TX
+
+The NRF24L01+ IRQ pin (pin 8) is active LOW and asserts after a successful
+transmission (TX_DS). `orchgateway` uses it to avoid busy-polling the STATUS
+register over SPI after each packet:
+
+- `maskIRQ(tx_ok=false, tx_fail=true, rx_ready=true)` — only TX_DS asserts the pin
+- After `writeFast()`, the gateway does a `poll(POLLPRI, 5 ms)` on the GPIO sysfs
+  value file and calls `whatHappened()` to clear the flag
+- On timeout (no IRQ within 5 ms) the TX FIFO is flushed and the send is retried
+  on the next cycle
+
+To **disable** IRQ (blocking TX fallback): set `"irq_pin": -1`.
 
 ---
 
 ## SPI bus speed
 
-The NRF24L01+ supports SPI clock up to **10 MHz**. The default of 10 MHz
-works reliably; lower it to 2–4 MHz if you experience wiring issues.
-
----
-
-## Raspberry Pi (reference wiring)
-
-If using a Raspberry Pi instead of Orange Pi Zero 3:
-
-| NRF24L01+ pin | Signal | RPi header pin | BCM GPIO |
-|:---:|---|:---:|:---:|
-| 1 | GND   | 20 | GND  |
-| 2 | VCC   |  1 | 3.3 V |
-| 3 | CE    | 22 | **25** |
-| 4 | CSN   | 24 | 8 (CE0) |
-| 5 | SCK   | 23 | 11 |
-| 6 | MOSI  | 19 | 10 |
-| 7 | MISO  | 21 | 9 |
-| 8 | IRQ   | 18 | **24** (optional) |
-
-CE = GPIO 25 (BCM) → set `"ce_pin": 25` in config (RPi default).
-IRQ = GPIO 24 (BCM) → set `"irq_pin": 24` to enable interrupt-driven TX.
+The NRF24L01+ supports SPI clock up to **10 MHz**. Lower to 2–4 MHz if you
+experience wiring issues.
 
 ---
 

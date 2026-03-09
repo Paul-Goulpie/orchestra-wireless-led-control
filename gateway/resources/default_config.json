@@ -2,11 +2,11 @@
   "radio": {
     "spi_device": "/dev/spidev0.0",
     "spi_speed_hz": 10000000,
-    "ce_pin": 25,
+    "ce_pin": 0,
     "channel": 76,
     "data_rate": "1mbps",
     "repeat_count": 1,
-    "irq_pin": 24
+    "irq_pin": 70
   },
   "network": {
     "sacn_timeout_ms": 2000,
