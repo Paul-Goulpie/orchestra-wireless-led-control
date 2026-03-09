@@ -94,6 +94,59 @@ Maintenant on passe à l'implémentation coté gateway
 Met tout le code et le Makefile dans /gateway
 
 le projet sera codé en C.
-Coté cible ça sera du linux - compilable en direct ou cross compile pour cible arm.
+Coté cible ça sera du linux - compilable en natif ou cross compile pour cible arm. (géré par redéfinition de $CC)
 La cible finale sera une Orange-Pi-Zero-3 sous debian - http://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/details/Orange-Pi-Zero-3.html
 Le module RF24 sera le suivant : NRF24L01+PA+LNA - https://www.amazon.fr/dp/B0DT6XTJ8H?ref=ppx_yo2ov_dt_b_fed_asin_title
+Le module RF24 est cablé avec la cible via du SPI (renseigne un tableau de mapping - dans un doc md dédié)
+
+Trouve un nom d'appli adapté. dans le cadre de ce descriptif je vais utiliser <app_gateway>
+
+L'appli utilise des arguments long et court (quand possible)  (utilisation de getopt). (chaque option a une valeur par défaut)
+<app_gateway> -h ou <app_gateway> --help doit afficher un manuel complet de l'outil avec listing exhaustif de toute les options et détails associés et valeur par défaut - correctement formaté en colonne.
+<app_gateway> -v ou <app_gateway> --verbose active le mode verbeux
+<app_gateway> -f ou <app_gateway> --config-file permet de paramétrer la localisation du fichier de configuration (par défaut /etc/<app_gateway>.json) (le format json est utilisé - exploite un lib json pour le parsing et formatage (par défaut avec un indent de 2)).
+Si le fichier de configuration n'hexiste pas un fichier de configuration est crée par défaut (utilisant un template par défaut fourni dans le code de l'application - le template par défaut sera linké avec l'application en tant que ressource de telle façon à etre intéfré dans le binaire mais de permettre une édition simple lors de la phase de dev).
+
+Le fichier de configuration permet de déclarer chaque node avec son nom , son addresse et le nombre de led (10 par défaut).
+Le fichier de configuration permet de déclarer chaque univers avec 
+  - son nom
+  - son identifiant d'univers
+  - son adresse de multicast - utilise la convention par défaut suivante:
+        239.255.<Universe >> 8>.<Universe & 0xFF>
+
+        Exemples :
+
+        univers	multicast
+        1	239.255.0.1
+        2	239.255.0.2
+        10	239.255.0.10
+        256	239.255.1.0
+  - son port udp (5568 par défaut).
+Le fichier de configuration permet de déclarer l'appartenance d'un node à un univers.
+
+Je te laisse choisir la bonne organisation du fichier de conf afin de pouvoir intégrer tout ces concepts.
+
+L'idée est que le composant gateway reçoie des trames sACN (généré par QLC+) - soit en unicast ou multicast.
+Il converti les données reçu au format node - à savoir 
+struct __attribute__((packed)) node_packet_v1 {
+    uint8_t dst_addr;   /* destination node address (1-63) */
+    uint8_t frame_id;   /* wrapping counter, incremented per frame */
+    uint8_t rgb[30];    /* 10 LED × 3 bytes (R, G, B) */
+};
+
+L'appli <app_gateway> gère le frame_id (attention le mieux il me semble est de gérer par node - pas global - en effet voir si dessous le mode différentiel et la trame de refresh peux donc aboutir à des valeurs de frame_id différents par node)
+
+ensuite il effectue le transfert vers les nodes.
+Coté RF24 , la configuration est sans ACK envoi en broadcast - channel paramétrable (76 par défaut) - vitesse paramétrable (1Mbps par défaut) - nombre de répétition d'envoi paramétrable (1 par défaut - ce qui veux dire que les paquets radio sont envoyé 2 fois - 1=> envoi original 2=> envoi copie 1).
+Les données sont envoyé en différentiel (seule les valeurs qui change donne lieu à un envoi - afin de diminuer le traffic).
+Une trame de refresh général est envoyé toutes les 1 secondes (si un node a déja été mis à jour on ne lui envoi pas la trame de refresh).
+Ceci implique la mise en place d'un buffer d'envoi pour traiter le coté envoi différentiel.
+
+Une unitié de service systemd sera rédigé - pour mettre en place le démarrage auto.
+La configuration SPI (device , vitesse , etc) est configurable (avec config par défaut correspondant à la config nominale et opérationnelle).
+En cas de perte de réseau (non réception de trame sACN pendant plus de 2 secondes (ce temps est paramétrable) la gateway envoi des trames radio correspondant à l'état éteind des nodes.
+La stratégie d'envoi ne consiste pas à envoyer tout les paquets emis par QLC+ , des effets de timings peuvent empecher ce comportement , envoi par radio les dernières valeurs à jours - si il y a des cas ou ces paquets ne sont pas envoyés génère un log (avec timestamp  et identifiants univers et node) et alimente une structure de statistique.
+
+Le soft génère des logs et des stats (nombre paquets sACN reçu, perte réseau , stat paquets perdu  / sACN et  radio , etc...).
+
+Si j'ai oublié des éléments , rajoute les.
