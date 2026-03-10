@@ -1,0 +1,9 @@
+[submodule "gateway/libs/cJSON"]
+	path = gateway/libs/cJSON
+	url = https://github.com/DaveGamble/cJSON
+[submodule "gateway/libs/sACN"]
+	path = gateway/libs/sACN
+	url = https://github.com/ETCLabs/sACN
+[submodule "gateway/libs/RF24"]
+	path = gateway/libs/RF24
+	url = https://github.com/nRF24/RF24.git
