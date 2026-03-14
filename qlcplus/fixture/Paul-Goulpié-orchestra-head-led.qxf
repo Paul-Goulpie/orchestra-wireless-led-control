@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE FixtureDefinition>
+<FixtureDefinition xmlns="http://www.qlcplus.org/FixtureDefinition">
+ <Creator>
+  <Name>Q Light Controller Plus</Name>
+  <Version>4.14.3</Version>
+  <Author>Paul GOULPIÉ</Author>
+ </Creator>
+ <Manufacturer>Paul Goulpié</Manufacturer>
+ <Model>orchestra-head-led</Model>
+ <Type>LED Bar (Pixels)</Type>
+ <Channel Name="led-01-R" Preset="IntensityRed"/>
+ <Channel Name="led-01-G" Preset="IntensityGreen"/>
+ <Channel Name="led-01-B" Preset="IntensityBlue"/>
+ <Channel Name="led-02-R" Preset="IntensityRed"/>
+ <Channel Name="led-02-G" Preset="IntensityGreen"/>
+ <Channel Name="led-02-B" Preset="IntensityBlue"/>
+ <Channel Name="led-03-R" Preset="IntensityRed"/>
+ <Channel Name="led-03-G" Preset="IntensityGreen"/>
+ <Channel Name="led-03-B" Preset="IntensityBlue"/>
+ <Channel Name="led-04-R" Preset="IntensityRed"/>
+ <Channel Name="led-04-G" Preset="IntensityGreen"/>
+ <Channel Name="led-04-B" Preset="IntensityBlue"/>
+ <Channel Name="led-05-R" Preset="IntensityRed"/>
+ <Channel Name="led-05-G" Preset="IntensityGreen"/>
+ <Channel Name="led-05-B" Preset="IntensityBlue"/>
+ <Channel Name="led-06-R" Preset="IntensityRed"/>
+ <Channel Name="led-06-G" Preset="IntensityGreen"/>
+ <Channel Name="led-06-B" Preset="IntensityBlue"/>
+ <Channel Name="led-07-R" Preset="IntensityRed"/>
+ <Channel Name="led-07-G" Preset="IntensityGreen"/>
+ <Channel Name="led-07-B" Preset="IntensityBlue"/>
+ <Channel Name="led-08-R" Preset="IntensityRed"/>
+ <Channel Name="led-08-G" Preset="IntensityGreen"/>
+ <Channel Name="led-08-B" Preset="IntensityBlue"/>
+ <Channel Name="led-09-R" Preset="IntensityRed"/>
+ <Channel Name="led-09-G" Preset="IntensityGreen"/>
+ <Channel Name="led-09-B" Preset="IntensityBlue"/>
+ <Channel Name="led-10-R" Preset="IntensityRed"/>
+ <Channel Name="led-10-G" Preset="IntensityGreen"/>
+ <Channel Name="led-10-B" Preset="IntensityBlue"/>
+ <Mode Name="default">
+  <Channel Number="0">led-01-R</Channel>
+  <Channel Number="1">led-01-G</Channel>
+  <Channel Number="2">led-01-B</Channel>
+  <Channel Number="3">led-02-R</Channel>
+  <Channel Number="4">led-02-G</Channel>
+  <Channel Number="5">led-02-B</Channel>
+  <Channel Number="6">led-03-R</Channel>
+  <Channel Number="7">led-03-G</Channel>
+  <Channel Number="8">led-03-B</Channel>
+  <Channel Number="9">led-04-R</Channel>
+  <Channel Number="10">led-04-G</Channel>
+  <Channel Number="11">led-04-B</Channel>
+  <Channel Number="12">led-05-R</Channel>
+  <Channel Number="13">led-05-G</Channel>
+  <Channel Number="14">led-05-B</Channel>
+  <Channel Number="15">led-06-R</Channel>
+  <Channel Number="16">led-06-G</Channel>
+  <Channel Number="17">led-06-B</Channel>
+  <Channel Number="18">led-07-R</Channel>
+  <Channel Number="19">led-07-G</Channel>
+  <Channel Number="20">led-07-B</Channel>
+  <Channel Number="21">led-08-R</Channel>
+  <Channel Number="22">led-08-G</Channel>
+  <Channel Number="23">led-08-B</Channel>
+  <Channel Number="24">led-09-R</Channel>
+  <Channel Number="25">led-09-G</Channel>
+  <Channel Number="26">led-09-B</Channel>
+  <Channel Number="27">led-10-R</Channel>
+  <Channel Number="28">led-10-G</Channel>
+  <Channel Number="29">led-10-B</Channel>
+ </Mode>
+ <Physical>
+  <Bulb Type="LED" Lumens="0" ColourTemperature="0"/>
+  <Dimensions Weight="0" Width="0" Height="0" Depth="0"/>
+  <Lens Name="Other" DegreesMin="0" DegreesMax="0"/>
+  <Focus Type="Fixed" PanMax="0" TiltMax="0"/>
+  <Technical PowerConsumption="0" DmxConnector="Other"/>
+ </Physical>
+</FixtureDefinition>
