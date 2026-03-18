@@ -7,3 +7,6 @@
 [submodule "gateway/libs/RF24"]
 	path = gateway/libs/RF24
 	url = https://github.com/nRF24/RF24.git
+[submodule "gateway/deps/cJSON"]
+	path = gateway/deps/cJSON
+	url = https://github.com/DaveGamble/cJSON
