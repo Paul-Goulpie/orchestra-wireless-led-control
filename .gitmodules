@@ -5,7 +5,7 @@
 	path = gateway/deps/sACN
 	url = https://github.com/ETCLabs/sACN
 [submodule "gateway/libs/RF24"]
-	path = gateway/libs/RF24
+	path = gateway/deps/RF24
 	url = https://github.com/nRF24/RF24.git
 [submodule "gateway/deps/cJSON"]
 	path = gateway/deps/cJSON
