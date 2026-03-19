@@ -2,8 +2,8 @@ APP      := orchgateway
 CC       := gcc
 CXX      := g++
 
-CFLAGS   := -Wall -Wextra -O2 -std=c11 -D_POSIX_C_SOURCE=200809L
-CXXFLAGS := -Wall -Wextra -O2 -std=c++14
+CFLAGS   := -Wall -Wextra -O0 -std=c11 -D_POSIX_C_SOURCE=200809L -g3
+CXXFLAGS := -Wall -Wextra -O0 -std=c++14 -g3
 
 SRC_DIR   := src
 RES_DIR   := resources
