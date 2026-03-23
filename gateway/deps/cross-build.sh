@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-CROSS_COMPILE=${CROSS_COMPILE:-aarch64-linux-gnu-}
+CROSS_PREFIX=${CROSS_PREFIX:-aarch64-linux-gnu-}
 
 echo "start with
-	CROSS_COMPILE : ${CROSS_COMPILE}"
+	CROSS_PREFIX : ${CROSS_PREFIX}"
 
-export CC=${CROSS_COMPILE}gcc
-export CXX=${CROSS_COMPILE}g++
-export ASM=${CROSS_COMPILE}as
+export CC=${CROSS_PREFIX}gcc
+export CXX=${CROSS_PREFIX}g++
+export ASM=${CROSS_PREFIX}as
 
 ./build.sh
