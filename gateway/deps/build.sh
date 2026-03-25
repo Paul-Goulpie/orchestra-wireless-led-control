@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 
-if [ ! -f cJSON/.git ]; then
-	git submodule init
-	git submodule update cJSON
-fi
-cmake -B build/cJSON cJSON
-cmake --build build/cJSON -j $(nproc)
-sudo cmake --install build/cJSON
+SCRIPT_PATH=$(dirname $0)
 
-if [ ! -f sACN/.git ]; then
+if [ ! -f ${SCRIPT_PATH}/cJSON/.git ]; then
 	git submodule init
-	git submodule update sACN
+	git submodule update ${SCRIPT_PATH}/cJSON
 fi
-cmake -B build/sACN sACN
-cmake --build build/sACN -j $(nproc)
-sudo cmake --install build/sACN
+cmake -B ${SCRIPT_PATH}/build/cJSON ${SCRIPT_PATH}/cJSON
+cmake --build ${SCRIPT_PATH}/build/cJSON -j $(nproc)
+sudo cmake --install ${SCRIPT_PATH}/build/cJSON
 
-if [ ! -f RF24/.git ]; then
+if [ ! -f ${SCRIPT_PATH}/sACN/.git ]; then
 	git submodule init
-	git submodule update RF24
+	git submodule update ${SCRIPT_PATH}/sACN
 fi
-cmake -B build/RF24 RF24
-cmake --build build/RF24 -j $(nproc)
-sudo cmake --install build/RF24
+cmake -B ${SCRIPT_PATH}/build/sACN ${SCRIPT_PATH}/sACN
+cmake --build ${SCRIPT_PATH}/build/sACN -j $(nproc)
+sudo cmake --install ${SCRIPT_PATH}/build/sACN
+
+if [ ! -f ${SCRIPT_PATH}/RF24/.git ]; then
+	git submodule init
+	git submodule update ${SCRIPT_PATH}/RF24
+fi
+cmake -B ${SCRIPT_PATH}/build/RF24 ${SCRIPT_PATH}/RF24
+cmake --build ${SCRIPT_PATH}/build/RF24 -j $(nproc)
+sudo cmake --install ${SCRIPT_PATH}/build/RF24
